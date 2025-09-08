@@ -1,15 +1,20 @@
 import { useEffect } from 'react';
-import { useAuth } from '@getmocha/users-service/react';
+import { useAuth } from '@/react-app/contexts/AuthContext';
 import { useNavigate } from 'react-router';
 
 export default function AuthCallback() {
+  // const { exchangeCodeForSessionToken } = useAuth();
   const { exchangeCodeForSessionToken } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        await exchangeCodeForSessionToken();
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get("code");
+        if (code) {
+          exchangeCodeForSessionToken(code);
+        }
         // After successful login, redirect to check registration status
         navigate('/dashboard');
       } catch (error) {

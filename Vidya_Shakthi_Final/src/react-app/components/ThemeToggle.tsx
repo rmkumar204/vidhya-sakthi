@@ -2,7 +2,7 @@ import { Moon, Sun } from 'lucide-react';
 import { useTheme } from '@/react-app/contexts/ThemeContext';
 
 export default function ThemeToggle() {
-  const { theme, toggleTheme } = useTheme();
+  const { isDark, toggleTheme } = useTheme();
 
   return (
     <button
@@ -11,8 +11,8 @@ export default function ThemeToggle() {
       aria-label="Toggle theme"
     >
       <div className="relative w-6 h-6">
-        <Sun className={`absolute inset-0 w-6 h-6 text-yellow-500 transition-all duration-300 ${theme === 'dark' ? 'rotate-90 scale-0' : 'rotate-0 scale-100'}`} />
-        <Moon className={`absolute inset-0 w-6 h-6 text-blue-400 transition-all duration-300 ${theme === 'light' ? '-rotate-90 scale-0' : 'rotate-0 scale-100'}`} />
+        <Sun className={`absolute inset-0 w-6 h-6 text-yellow-500 transition-all duration-300 ${isDark === true ? 'rotate-90 scale-0' : 'rotate-0 scale-100'}`} />
+        <Moon className={`absolute inset-0 w-6 h-6 text-blue-400 transition-all duration-300 ${isDark === false ? '-rotate-90 scale-0' : 'rotate-0 scale-100'}`} />
       </div>
     </button>
   );

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { useAuth } from '@getmocha/users-service/react';
+import { useAuth } from '@/react-app/contexts/AuthContext';
 import { UserRoleType, EmailPasswordLoginSchema } from '@/shared/types';
 import ThemeToggle from '@/react-app/components/ThemeToggle';
 import { ArrowLeft, LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { useAuth } from '@getmocha/users-service/react';
+import { useAuth } from '@/react-app/contexts/AuthContext';
 import { UserRoleType, PersonalDetailsSchema, EducationalDetailsSchema, PreferencesSchema, RegistrationStepType, PersonalDetailsType, EducationalDetailsType, PreferencesType } from '@/shared/types';
 import ThemeToggle from '@/react-app/components/ThemeToggle';
 import RegistrationStepper from '@/react-app/components/RegistrationStepper';

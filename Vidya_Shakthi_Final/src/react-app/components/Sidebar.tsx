@@ -8,9 +8,12 @@ import {
   SpeakerWaveIcon, 
   ChatBubbleLeftRightIcon,
   Cog6ToothIcon,
-  AcademicCapIcon
+  AcademicCapIcon,
+
 } from '@heroicons/react/24/outline';
+import { Settings, LogOut } from 'lucide-react';
 import { useAuth, UserRole } from '@/react-app/contexts/AuthContext';
+import { useNavigate } from 'react-router';
 
 interface SidebarProps {
   sidebarOpen: boolean;
@@ -60,11 +63,22 @@ const navigation = {
 export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
   const { user } = useAuth();
   const userNavigation = navigation[user?.role as UserRole] || navigation.mentor;
+  const navigate = useNavigate();
+
 
   const handleNavClick = () => {
     // Close sidebar on mobile/tablet after navigation
     if (window.innerWidth < 1024) {
       setSidebarOpen(false);
+    }
+  };
+
+    const handleLogout = async () => {
+    try {
+      // await logout();
+      navigate('/');
+    } catch (error) {
+      console.error('Logout failed:', error);
     }
   };
 
@@ -134,6 +148,22 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
               </NavLink>
             ))}
           </nav>
+            {/* Footer Actions */}
+          <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex gap-2">
+              <button className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                <Settings className="w-4 h-4" />
+                <span className="text-sm">Settings</span>
+              </button>
+              <button 
+                onClick={handleLogout}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="text-sm">Logout</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </>

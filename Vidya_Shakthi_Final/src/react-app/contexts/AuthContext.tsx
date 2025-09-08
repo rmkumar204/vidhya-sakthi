@@ -22,13 +22,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
     // For demo purposes, start with a mentor user
-    return {
-      id: '1',
-      name: 'John Doe',
-      email: 'john.doe@email.com',
-      role: 'mentor',
-      avatar: '🧑‍🏫'
-    };
+    // return {
+    //   id: '1',
+    //   name: 'John Doe',
+    //   email: 'john.doe@email.com',
+    //   role: 'mentor',
+    //   avatar: '🧑‍🏫'
+    // };
+    return null;
   });
 
   const login = (userData: User) => {

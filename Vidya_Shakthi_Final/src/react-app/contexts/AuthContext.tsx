@@ -1,60 +1,86 @@
-import React, { createContext, useContext, useState } from 'react';
-
-export type UserRole = 'mentor' | 'mentee' | 'reviewer' | 'state_admin' | 'super_admin';
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  avatar?: string;
-}
-
-interface AuthContextType {
-  user: User | null;
-  login: (userData: User) => void;
-  logout: () => void;
-  isAuthenticated: boolean;
-  exchangeCodeForSessionToken: (code: string) => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+import React, { useState } from "react";
+import { useNavigate } from "react-router";
+import { AuthContext, User, UserRole } from "./AuthContext.types";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const [user, setUser] = useState<User | null>(() => {
-    // For demo purposes, start with a mentor user
-    // return {
-    //   id: '1',
-    //   name: 'John Doe',
-    //   email: 'john.doe@email.com',
-    //   role: 'mentor',
-    //   avatar: '🧑‍🏫'
-    // };
-    return null;
+  const [user, setUser] = useState<User | null>(() => {
+    const savedUser = localStorage.getItem("user");
+    return savedUser ? JSON.parse(savedUser) : null;
   });
 
-   const login = (userData: User) => {
-    setUser(userData);
-    localStorage.setItem("user", JSON.stringify(userData));
+  const [isPending, setIsPending] = useState(false);
+  const navigate = useNavigate();
+
+  /** ✅ Save user in state + localStorage */
+  const login = (userData: User) => {
+    // setUser(userData);
+    setUser({
+      id: "12345",
+      name: "Ram Kumar",
+      email: "ramkumar@example.com",
+      role: "mentee",
+      avatar: '🧑‍🏫'
+    });
+    // localStorage.setItem("user", JSON.stringify(userData));
+    localStorage.setItem("user",JSON.stringify({
+      id: "12345",
+      name: "Ram Kumar",
+      email: "ramkumar@example.com",
+      role: "mentee",
+      avatar: '🧑‍🏫'
+    }))
   };
 
+  /** ✅ Clear user + token and send back to role selection/login */
   const logout = () => {
     setUser(null);
     localStorage.removeItem("user");
     localStorage.removeItem("access_token");
+    redirectToLogin();
   };
 
+  /** ✅ Navigate back to login/role page */
+  const redirectToLogin = (role?: UserRole) => {
+    const path = role ? `/login/${role}` : "/";
+    navigate(path);
+  };
 
   const isAuthenticated = !!user;
 
-  const exchangeCodeForSessionToken = async (code: string) => {
+  /** ✅ Handle Google OAuth code → session token + user profile */
+  const exchangeCodeForSessionToken = async (code: string): Promise<void> => {
+    setIsPending(true);
     try {
+      // ---- STEP 1: Hit your backend to exchange code ----
+      const response = await fetch(
+        "http://localhost:5000/api/auth/google/login",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to exchange code for token (backend)");
+      }
+
+      const backendData = await response.json();
+      login(backendData); // assumes backend returns user object
+    } catch (error) {
+      console.error("Backend token exchange error:", error);
+    } finally {
+      setIsPending(false);
+    }
+
+    try {
+      // ---- STEP 2: Directly hit Google for OAuth token (optional) ----
       const response = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
           code,
-          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,   // ✅ Vite style env vars
+          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
           client_secret: import.meta.env.VITE_GOOGLE_CLIENT_SECRET,
           redirect_uri: "http://localhost:5173/auth/callback",
           grant_type: "authorization_code",
@@ -62,15 +88,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to exchange code for token");
+        throw new Error("Failed to exchange code with Google");
       }
 
       const data = await response.json();
 
-      // Save token securely (demo = localStorage, but real apps should use httpOnly cookies)
+      // ✅ Save token (for demo use localStorage, for prod use httpOnly cookie)
       localStorage.setItem("access_token", data.access_token);
 
-      // If provider returns `id_token`, decode it to extract user profile
+      // ✅ If Google returned id_token, decode user info
       if (data.id_token) {
         const base64Url = data.id_token.split(".")[1];
         const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
@@ -80,30 +106,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: decodedPayload.sub,
           name: decodedPayload.name,
           email: decodedPayload.email,
-          role: "mentee", // 👈 default or map based on your app logic
+          role: "mentee", // default, or adjust based on your app logic
           avatar: decodedPayload.picture,
         };
 
         login(userData);
       }
     } catch (err) {
-      console.error("Error exchanging code:", err);
+      console.error("Google token exchange error:", err);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated, exchangeCodeForSessionToken }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        logout,
+        isAuthenticated,
+        isPending,
+        redirectToLogin,
+        exchangeCodeForSessionToken,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 }
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
-
-

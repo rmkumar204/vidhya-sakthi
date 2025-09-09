@@ -1,6 +1,7 @@
 import { Bars3Icon, SunIcon, MoonIcon, BellIcon } from '@heroicons/react/24/outline';
 import { useTheme } from '@/react-app/contexts/ThemeContext';
-import { useAuth } from '@/react-app/contexts/AuthContext';
+// import { useAuth } from '@/react-app/contexts/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 
 interface HeaderProps {
   setSidebarOpen: (open: boolean) => void;

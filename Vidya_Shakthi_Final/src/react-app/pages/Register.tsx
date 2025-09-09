@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { useAuth } from '@/react-app/contexts/AuthContext';
+// import { useAuth } from '@/react-app/contexts/AuthContext';
+import { useAuth } from '@/react-app/hooks/useAuth';
 import { UserRoleType, PersonalDetailsSchema, EducationalDetailsSchema, PreferencesSchema, RegistrationStepType, PersonalDetailsType, EducationalDetailsType, PreferencesType } from '@/shared/types';
 import ThemeToggle from '@/react-app/components/ThemeToggle';
 import RegistrationStepper from '@/react-app/components/RegistrationStepper';
@@ -135,7 +136,7 @@ export default function Register() {
       });
 
       if (response.ok) {
-        navigate('/dashboard');
+        navigate('/app/dashboard');
       } else {
         const data = await response.json();
         setErrors({ submit: data.error || 'Registration failed' });

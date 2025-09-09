@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { useAuth } from '@/react-app/contexts/AuthContext';
+// import { useAuth } from '@/react-app/contexts/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router';
 
 export default function AuthCallback() {
@@ -16,7 +17,7 @@ export default function AuthCallback() {
           exchangeCodeForSessionToken(code);
         }
         // After successful login, redirect to check registration status
-        navigate('/dashboard');
+        navigate('/app/dashboard');
       } catch (error) {
         console.error('Auth callback failed:', error);
         navigate('/');

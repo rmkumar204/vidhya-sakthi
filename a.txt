@@ -1,0 +1,24 @@
+backend/
+│   ├── src/
+│   │   ├── config/
+│   │   │   └── db.ts
+│   │   ├── controllers/
+│   │   │   └── auth.controller.ts
+│   │   ├── middleware/
+│   │   │   └── auth.middleware.ts
+│   │   ├── models/
+│   │   │   └── user.model.ts
+│   │   ├── routes/
+│   │   │   ├── auth.routes.ts
+│   │   │   └── user.routes.ts
+│   │   ├── services/
+│   │   │   └── google.service.ts
+│   │   ├── utils/
+│   │   │   └── generateToken.ts
+│   │   ├── shared/
+│   │   │   └── types.ts
+│   │   └── server.ts
+│   ├── .env
+│   ├── .gitignore
+│   ├── package.json
+│   └── tsconfig.json

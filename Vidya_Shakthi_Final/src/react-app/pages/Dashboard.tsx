@@ -6,7 +6,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import StatCard from '@/react-app/components/StatCard';
-import { useAuth } from '@/react-app/contexts/AuthContext';
+// import { useAuth } from '@/react-app/contexts/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 
 const mentorStats = [
   { title: 'My Mentees', value: '1200', change: '+12% from last month', changeType: 'positive' as const, icon: UsersIcon, iconColor: 'bg-blue-500' },

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { useAuth } from '@/react-app/contexts/AuthContext';
-import { UserRoleType, EmailPasswordLoginSchema } from '@/shared/types';
+import { useAuth } from '@/react-app/hooks/useAuth';
+import { UserRoleType } from '@/shared/types';
 import ThemeToggle from '@/react-app/components/ThemeToggle';
 import { ArrowLeft, LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 
@@ -41,7 +41,7 @@ const roleDescriptions = {
 export default function Login() {
   const { role } = useParams<{ role: UserRoleType }>();
   const navigate = useNavigate();
-  const { user, isPending, redirectToLogin } = useAuth();
+  const { user, isPending, redirectToLogin,login } = useAuth();
 
   const [loginMethod, setLoginMethod] = useState<'google' | 'email'>('google');
   const [formData, setFormData] = useState({
@@ -56,7 +56,7 @@ export default function Login() {
 
   useEffect(() => {
     if (user && !isPending) {
-      navigate('/dashboard');
+      navigate('/app/dashboard');
     }
   }, [user, isPending, navigate]);
 
@@ -76,7 +76,15 @@ export default function Login() {
     e.preventDefault();
     setErrors({});
     // setIsLoading(true);
-    navigate('/dashboard');
+    login(formData);
+  //  localStorage.setItem("user", JSON.stringify({
+  //     id: "12345",
+  //     name: "Ram Kumar",
+  //     email: "ramkumar@example.com",
+  //     role: "mentee",
+  //     avatar: '🧑‍🏫'
+  //   }));
+  //   navigate('/app/dashboard');
 
     // try {
     //   // Validate form data
@@ -91,7 +99,7 @@ export default function Login() {
     //   });
 
     //   if (response.ok) {
-    //     navigate('/dashboard');
+    //     navigate('/app/dashboard');
     //   } else {
     //     const data = await response.json();
     //     setErrors({ email: data.error || 'Login failed' });

@@ -31,6 +31,7 @@ const roleCards: RoleCardType[] = [
 ];
 
 export default function RoleSelection() {
+  console.log('here comes')
   const navigate = useNavigate();
 
   const handleRoleSelect = (role: UserRoleType) => {

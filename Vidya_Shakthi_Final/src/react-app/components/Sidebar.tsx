@@ -12,7 +12,9 @@ import {
 
 } from '@heroicons/react/24/outline';
 import { Settings, LogOut } from 'lucide-react';
-import { useAuth, UserRole } from '@/react-app/contexts/AuthContext';
+// import { useAuth, UserRole } from '@/react-app/contexts/AuthContext';
+import { useAuth } from '../hooks/useAuth';
+import { UserRole } from '../contexts/AuthContext.types';
 import { useNavigate } from 'react-router';
 
 interface SidebarProps {
@@ -22,48 +24,48 @@ interface SidebarProps {
 
 const navigation = {
   mentor: [
-    { name: 'Overview', href: '/dashboard', icon: HomeIcon },
-    { name: 'My Mentees', href: '/mentees', icon: UsersIcon },
-    { name: 'My Projects', href: '/projects', icon: FolderIcon },
-    { name: 'Tasks', href: '/tasks', icon: CheckIcon },
-    { name: 'Announcements', href: '/announcements', icon: SpeakerWaveIcon },
-    { name: 'Messages', href: '/messages', icon: ChatBubbleLeftRightIcon },
+    { name: 'Overview', href: '/app/dashboard', icon: HomeIcon },
+    { name: 'My Mentees', href: '/app/mentees', icon: UsersIcon },
+    { name: 'My Projects', href: '/app/projects', icon: FolderIcon },
+    { name: 'Tasks', href: '/app/tasks', icon: CheckIcon },
+    { name: 'Announcements', href: '/app/announcements', icon: SpeakerWaveIcon },
+    { name: 'Messages', href: '/app/messages', icon: ChatBubbleLeftRightIcon },
   ],
   mentee: [
-    { name: 'Overview', href: '/dashboard', icon: HomeIcon },
-    { name: 'My Mentors', href: '/mentors', icon: UsersIcon },
-    { name: 'Projects', href: '/projects', icon: FolderIcon },
-    { name: 'Tasks', href: '/tasks', icon: CheckIcon },
-    { name: 'Announcements', href: '/announcements', icon: SpeakerWaveIcon },
-    { name: 'Messages', href: '/messages', icon: ChatBubbleLeftRightIcon },
-    { name: 'Certificates', href: '/certificates', icon: AcademicCapIcon },
+    { name: 'Overview', href: '/app/dashboard', icon: HomeIcon },
+    { name: 'My Mentors', href: '/app/mentors', icon: UsersIcon },
+    { name: 'Projects', href: '/app/projects', icon: FolderIcon },
+    { name: 'Tasks', href: '/app/tasks', icon: CheckIcon },
+    { name: 'Announcements', href: '/app/announcements', icon: SpeakerWaveIcon },
+    { name: 'Messages', href: '/app/messages', icon: ChatBubbleLeftRightIcon },
+    { name: 'Certificates', href: '/app/certificates', icon: AcademicCapIcon },
   ],
   reviewer: [
-    { name: 'Overview', href: '/dashboard', icon: HomeIcon },
-    { name: 'Project Reviews', href: '/reviews', icon: FolderIcon },
-    { name: 'Comments', href: '/comments', icon: ChatBubbleLeftRightIcon },
-    { name: 'Messages', href: '/messages', icon: ChatBubbleLeftRightIcon },
+    { name: 'Overview', href: '/app/dashboard', icon: HomeIcon },
+    { name: 'Project Reviews', href: '/app/reviews', icon: FolderIcon },
+    { name: 'Comments', href: '/app/comments', icon: ChatBubbleLeftRightIcon },
+    { name: 'Messages', href: '/app/messages', icon: ChatBubbleLeftRightIcon },
   ],
   state_admin: [
-    { name: 'Overview', href: '/dashboard', icon: HomeIcon },
-    { name: 'User Management', href: '/users', icon: UsersIcon },
-    { name: 'Project Approvals', href: '/approvals', icon: FolderIcon },
-    { name: 'Analytics', href: '/analytics', icon: CheckIcon },
-    { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
+    { name: 'Overview', href: '/app/dashboard', icon: HomeIcon },
+    { name: 'User Management', href: '/app/users', icon: UsersIcon },
+    { name: 'Project Approvals', href: '/app/approvals', icon: FolderIcon },
+    { name: 'Analytics', href: '/app/analytics', icon: CheckIcon },
+    { name: 'Settings', href: '/app/settings', icon: Cog6ToothIcon },
   ],
   super_admin: [
-    { name: 'Overview', href: '/dashboard', icon: HomeIcon },
-    { name: 'System Config', href: '/config', icon: Cog6ToothIcon },
-    { name: 'User Management', href: '/users', icon: UsersIcon },
-    { name: 'Analytics', href: '/analytics', icon: CheckIcon },
-    { name: 'Messages', href: '/messages', icon: ChatBubbleLeftRightIcon },
+    { name: 'Overview', href: '/app/dashboard', icon: HomeIcon },
+    { name: 'System Config', href: '/app/config', icon: Cog6ToothIcon },
+    { name: 'User Management', href: '/app/users', icon: UsersIcon },
+    { name: 'Analytics', href: '/app/analytics', icon: CheckIcon },
+    { name: 'Messages', href: '/app/messages', icon: ChatBubbleLeftRightIcon },
   ]
 };
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
-  const { user } = useAuth();
+  const { user,logout } = useAuth();
   const userNavigation = navigation[user?.role as UserRole] || navigation.mentor;
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
 
 
   const handleNavClick = () => {
@@ -76,7 +78,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
     const handleLogout = async () => {
     try {
       // await logout();
-      navigate('/');
+      localStorage.removeItem('user');
+      logout();
     } catch (error) {
       console.error('Logout failed:', error);
     }

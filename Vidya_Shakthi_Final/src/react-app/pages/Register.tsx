@@ -36,6 +36,7 @@ export default function Register() {
 
   // Form data state
   const [personalData, setPersonalData] = useState<PersonalDetailsType>({
+    email: '',
     first_name: '',
     middle_name: '',
     last_name: '',

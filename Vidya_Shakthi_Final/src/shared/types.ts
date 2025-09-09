@@ -11,6 +11,7 @@ export type RegistrationStepType = z.infer<typeof RegistrationStep>;
 
 // User registration schema - split into steps
 export const PersonalDetailsSchema = z.object({
+  email: z.string().email(),
   first_name: z.string().min(1, "First name is required"),
   middle_name: z.string().optional(),
   last_name: z.string().min(1, "Last name is required"),
@@ -60,7 +61,7 @@ export const PreferencesSchema = z.object({
 
 // Complete user registration schema
 export const UserRegistrationSchema = z.object({
-  email: z.string().email(),
+  
   role: UserRole,
   personal: PersonalDetailsSchema,
   educational: EducationalDetailsSchema,

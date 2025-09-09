@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // ---- STEP 1: Hit your backend to exchange code ----
       const response = await fetch(
-        "http://localhost:5000/api/auth/google/login",
+        "http://localhost:3000/api/auth/google/login",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

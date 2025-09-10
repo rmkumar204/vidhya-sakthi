@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { useAuth } from '@/react-app/hooks/useAuth';
-import { UserRoleType } from '@/shared/types';
+import { UserRoleType, EmailPasswordLoginSchema } from '@/shared/types';
 import ThemeToggle from '@/react-app/components/ThemeToggle';
 import { ArrowLeft, LogIn, Mail, Lock, Eye, EyeOff, Send } from 'lucide-react';
 
@@ -113,23 +113,24 @@ export default function Login() {
     
     setIsLoading(true);
     
-    try {
-      // TODO: Implement actual email/password authentication
-      // For now, create a mock user object for testing
-      const mockUser = {
-        id: "12345",
-        name: "Test User",
-        email: formData.email,
-        role: role as UserRoleType,
-        avatar: '🧑‍🏫'
-      };
-      
-      login(mockUser);
-    } catch {
-      setErrors({ email: 'Login failed. Please check your credentials.' });
-    } finally {
-      setIsLoading(false);
-    }
+    // try {
+    //   // TODO: Implement actual email/password authentication
+    //   // For now, create a mock user object for testing
+    //   const mockUser = {
+    //     // id: "12345",
+    //     // name: "Test User",
+    //     email: formData.email,
+    //     role: role as UserRoleType,
+    //     avatar: '🧑‍🏫',
+    //     password : formData.password,
+    //   };
+    //   // console.log(formData)
+    //   login(mockUser);
+    // } catch {
+    //   setErrors({ email: 'Login failed. Please check your credentials.' });
+    // } finally {
+    //   setIsLoading(false);
+    // }
   //  localStorage.setItem("user", JSON.stringify({
   //     id: "12345",
   //     name: "Ram Kumar",
@@ -139,33 +140,41 @@ export default function Login() {
   //   }));
   //   navigate('/app/dashboard');
 
-    // try {
-    //   // Validate form data
-    //   EmailPasswordLoginSchema.parse(formData);
+    try {
+      // Validate form data
+      // const {email, password} = EmailPasswordLoginSchema.parse(formData);
 
-    //   const response = await fetch('/api/auth/login', {
-    //     method: 'POST',
-    //     headers: {
-    //       'Content-Type': 'application/json',
-    //     },
-    //     body: JSON.stringify({ ...formData, role }),
-    //   });
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ...formData, role }),
+      });
 
-    //   if (response.ok) {
-    //     navigate('/app/dashboard');
-    //   } else {
-    //     const data = await response.json();
-    //     setErrors({ email: data.error || 'Login failed' });
-    //   }
-    // } catch (error: any) {
-    //   const newErrors: Record<string, string> = {};
-    //   error.errors?.forEach((err: any) => {
-    //     newErrors[err.path[0]] = err.message;
-    //   });
-    //   setErrors(newErrors);
-    // } finally {
-    //   setIsLoading(false);
-    // }
+      if (response.ok) {
+        const data = await response.json();
+         localStorage.setItem("user", JSON.stringify({
+          id: data._id,
+          name: data.name,
+          email: data.email,
+          role: data.role,
+          avatar: '🧑‍🏫'
+        }));
+        navigate('/app/dashboard');
+      } else {
+        const data = await response.json();
+        setErrors({ email: data.error || 'Login failed' });
+      }
+    } catch (error: any) {
+      const newErrors: Record<string, string> = {};
+      error.errors?.forEach((err: any) => {
+        newErrors[err.path[0]] = err.message;
+      });
+      setErrors(newErrors);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

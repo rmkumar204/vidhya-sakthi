@@ -254,7 +254,7 @@ const handleVerifyOtp = async () => {
       });
   
       if (compRes.ok) {
-        navigate('/app/dashboard');
+        navigate(`/login/${role}`);
       } else {
         const data = await compRes.json();
         setErrors({ submit: data.error || 'Registration completion failed' });

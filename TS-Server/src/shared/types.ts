@@ -70,7 +70,7 @@ export type PreferencesType = z.infer<typeof PreferencesSchema>;
 
 // --- Full Registration Payload ---
 export const UserRegistrationSchema = z.object({
-  email: z.string().email(),
+  // email: z.string().email(),
   role: UserRole,
   personal: PersonalDetailsSchema,
   educational: EducationalDetailsSchema,

@@ -5,6 +5,7 @@ interface PersonalDetailsStepProps {
   data: PersonalDetailsType;
   onChange: (data: PersonalDetailsType) => void;
   errors: Record<string, string>;
+  submitAttempted?: boolean;
 }
 
 interface IState {
@@ -35,8 +36,10 @@ interface IPincodes {
 export default function PersonalDetailsStep({
   data,
   onChange,
-  errors
+  errors,
+  submitAttempted
 }: PersonalDetailsStepProps) {
+  const [dirty, setDirty] = useState<Record<string, boolean>>({});
   const [states, setStates] = useState<IState[]>([]);
   const [districts, setDistricts] = useState<IDistrict[]>([]);
   const [blocks, setBlocks] = useState<IBlock[]>([]);
@@ -96,6 +99,7 @@ export default function PersonalDetailsStep({
   }, [data.block]);
 
   const handleInputChange = (field: keyof PersonalDetailsType, value: string) => {
+    setDirty((prev) => ({ ...prev, [field as string]: true }));
     onChange({
       ...data,
       [field]: value
@@ -124,11 +128,11 @@ export default function PersonalDetailsStep({
             value={data.first_name}
             onChange={(e) => handleInputChange('first_name', e.target.value)}
             className={`w-full px-4 py-3 rounded-lg border ${
-              errors.first_name ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+              errors.first_name && (submitAttempted || !dirty.first_name) ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
             } bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
             placeholder="Enter your first name"
           />
-          {errors.first_name && <p className="text-red-500 text-sm mt-1">{errors.first_name}</p>}
+          {errors.first_name && (submitAttempted || !dirty.first_name) && <p className="text-red-500 text-sm mt-1">{errors.first_name}</p>}
         </div>
 
         {/* Middle Name */}
@@ -155,28 +159,28 @@ export default function PersonalDetailsStep({
             value={data.last_name}
             onChange={(e) => handleInputChange('last_name', e.target.value)}
             className={`w-full px-4 py-3 rounded-lg border ${
-              errors.last_name ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+              errors.last_name && (submitAttempted || !dirty.last_name) ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
             } bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
             placeholder="Enter your last name"
           />
-          {errors.last_name && <p className="text-red-500 text-sm mt-1">{errors.last_name}</p>}
+          {errors.last_name && (submitAttempted || !dirty.last_name) && <p className="text-red-500 text-sm mt-1">{errors.last_name}</p>}
         </div>
 
-        {/* Email */}
+        {/* Password */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Email *
+            Password *
           </label>
           <input
-            type="email"
-            value={data.email}
-            onChange={(e) => handleInputChange('email', e.target.value)}
+            type="password"
+            value={(data as any).password || ''}
+            onChange={(e) => handleInputChange('password' as any, e.target.value)}
             className={`w-full px-4 py-3 rounded-lg border ${
-              errors.email ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+              (errors as any).password && (submitAttempted || !dirty.password) ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
             } bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
-            placeholder="Enter your email"
+            placeholder="Enter a strong password"
           />
-          {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+          {(errors as any).password && (submitAttempted || !dirty.password) && <p className="text-red-500 text-sm mt-1">{(errors as any).password}</p>}
         </div>
 
         {/* Mobile Number */}
@@ -186,14 +190,21 @@ export default function PersonalDetailsStep({
           </label>
           <input
             type="tel"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={10}
             value={data.mobile_number}
-            onChange={(e) => handleInputChange('mobile_number', e.target.value)}
+            onChange={(e) => {
+              // allow only digits and cap at 10
+              const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 10);
+              handleInputChange('mobile_number', digitsOnly);
+            }}
             className={`w-full px-4 py-3 rounded-lg border ${
-              errors.mobile_number ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+              errors.mobile_number && (submitAttempted || !dirty.mobile_number) ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
             } bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
-            placeholder="Enter your mobile number"
+            placeholder="Enter 10-digit mobile number"
           />
-          {errors.mobile_number && <p className="text-red-500 text-sm mt-1">{errors.mobile_number}</p>}
+          {errors.mobile_number && (submitAttempted || !dirty.mobile_number) && <p className="text-red-500 text-sm mt-1">{errors.mobile_number}</p>}
         </div>
 
         {/* Date of Birth */}
@@ -205,11 +216,12 @@ export default function PersonalDetailsStep({
             type="date"
             value={data.date_of_birth}
             onChange={(e) => handleInputChange('date_of_birth', e.target.value)}
+            max={(function(){ const d=new Date(); d.setDate(d.getDate()-1); const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); const day=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; })()}
             className={`w-full px-4 py-3 rounded-lg border ${
-              errors.date_of_birth ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+              errors.date_of_birth && (submitAttempted || !dirty.date_of_birth) ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
             } bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
           />
-          {errors.date_of_birth && <p className="text-red-500 text-sm mt-1">{errors.date_of_birth}</p>}
+          {errors.date_of_birth && (submitAttempted || !dirty.date_of_birth) && <p className="text-red-500 text-sm mt-1">{errors.date_of_birth}</p>}
         </div>
 
         {/* ✅ State */}
@@ -221,7 +233,7 @@ export default function PersonalDetailsStep({
             value={data.state}
             onChange={(e) => handleInputChange('state', e.target.value)}
             className={`w-full px-4 py-3 rounded-lg border ${
-              errors.state ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+              errors.state && !dirty.state ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
             } bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
           >
             <option value="">Select your state</option>
@@ -231,7 +243,7 @@ export default function PersonalDetailsStep({
             </option>
             ))}
           </select>
-          {errors.state && <p className="text-red-500 text-sm mt-1">{errors.state}</p>}
+          {errors.state && !dirty.state && <p className="text-red-500 text-sm mt-1">{errors.state}</p>}
         </div>
 
         {/* ✅ District */}
@@ -249,7 +261,7 @@ export default function PersonalDetailsStep({
               handleInputChange('district', e.target.value);
             }}
             className={`w-full px-4 py-3 rounded-lg border ${
-              errors.district ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+              errors.district && !dirty.district ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
             } bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
           >
             <option value="">Select your district</option>
@@ -259,7 +271,7 @@ export default function PersonalDetailsStep({
               </option>
             ))}
           </select>
-          {errors.district && <p className="text-red-500 text-sm mt-1">{errors.district}</p>}
+          {errors.district && !dirty.district && <p className="text-red-500 text-sm mt-1">{errors.district}</p>}
         </div>
 
         {/* ✅ Block */}
@@ -277,7 +289,7 @@ export default function PersonalDetailsStep({
               handleInputChange('block', e.target.value);
             }}
             className={`w-full px-4 py-3 rounded-lg border ${
-              errors.block ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+              errors.block && !dirty.block ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
             } bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
           >
             <option value="">Select your block</option>
@@ -287,7 +299,7 @@ export default function PersonalDetailsStep({
               </option>
             ))}
           </select>
-          {errors.block && <p className="text-red-500 text-sm mt-1">{errors.block}</p>}
+          {errors.block && !dirty.block && <p className="text-red-500 text-sm mt-1">{errors.block}</p>}
         </div>
 
         {/* ✅ PIN Code */}
@@ -305,7 +317,7 @@ export default function PersonalDetailsStep({
               handleInputChange('pin_code', e.target.value);
             }}
             className={`w-full px-4 py-3 rounded-lg border ${
-              errors.pin_code ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+              errors.pin_code && !dirty.pin_code ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
             } bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
           >
             <option value="">Select your PIN code</option>
@@ -315,7 +327,7 @@ export default function PersonalDetailsStep({
               </option>
             ))}
           </select>
-          {errors.pin_code && <p className="text-red-500 text-sm mt-1">{errors.pin_code}</p>}
+          {errors.pin_code && !dirty.pin_code && <p className="text-red-500 text-sm mt-1">{errors.pin_code}</p>}
         </div>
 
         {/* Place/City */}
@@ -328,11 +340,11 @@ export default function PersonalDetailsStep({
             value={data.place_city}
             onChange={(e) => handleInputChange('place_city', e.target.value)}
             className={`w-full px-4 py-3 rounded-lg border ${
-              errors.place_city ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+              errors.place_city && !dirty.place_city ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
             } bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
             placeholder="Enter your place or city"
           />
-          {errors.place_city && <p className="text-red-500 text-sm mt-1">{errors.place_city}</p>}
+          {errors.place_city && !dirty.place_city && <p className="text-red-500 text-sm mt-1">{errors.place_city}</p>}
         </div>
       </div>
     </div>

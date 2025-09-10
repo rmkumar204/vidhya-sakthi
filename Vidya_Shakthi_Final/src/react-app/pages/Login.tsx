@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { useAuth } from '@/react-app/hooks/useAuth';
-import { UserRoleType, EmailPasswordLoginSchema } from '@/shared/types';
+import { UserRoleType } from '@/shared/types';
+import { User } from '../contexts/AuthContext.types';
 import ThemeToggle from '@/react-app/components/ThemeToggle';
 import { ArrowLeft, LogIn, Mail, Lock, Eye, EyeOff, Send } from 'lucide-react';
 
@@ -154,13 +155,16 @@ export default function Login() {
 
       if (response.ok) {
         const data = await response.json();
-         localStorage.setItem("user", JSON.stringify({
-          id: data._id,
-          name: data.name,
-          email: data.email,
-          role: data.role,
-          avatar: '🧑‍🏫'
-        }));
+       const userObj: User = {
+            id: data._id,
+            name: data.name,
+            email: data.email,
+            role: data.role,
+            avatar: '🧑‍🏫',
+            token: data.token,
+          };
+        login(userObj);   // ✅ updates context + localStorage
+        localStorage.setItem("access_token", data.token);
         navigate('/app/dashboard');
       } else {
         const data = await response.json();
@@ -262,7 +266,7 @@ export default function Login() {
         throw new Error(msg || 'OTP verification failed');
       }
       setErrors({ success: 'OTP verified successfully! You can now reset your password.' });
-      setOtp(['', '', '', '', '', '']);
+      // setOtp(['', '', '', '', '', '']);
       setShowOTPVerification(false);
       setShowResetPassword(true);
     } catch (err) {
@@ -327,11 +331,14 @@ export default function Login() {
         const msg = await res.text();
         throw new Error(msg || 'Failed to reset password');
       }
-      setErrors({ success: 'Password reset successfully! You can now login with your new password.' });
-      setResetPasswordData({ newPassword: '', confirmPassword: '' });
-      setShowResetPassword(false);
-      setShowForgotPassword(false);
-      setForgotPasswordEmail('');
+      setErrors({ success: 'Password reset successfully! You can now login with your new password.' })
+      setTimeout(()=>{
+        setResetPasswordData({ newPassword: '', confirmPassword: '' });
+        setShowResetPassword(false);
+        setShowForgotPassword(false);
+        setForgotPasswordEmail('');
+        setOtp(['', '', '', '', '', '']);
+      },1500)
     } catch (err) {
       setErrors({ resetPassword: 'Failed to reset password. Please try again.' });
     } finally {

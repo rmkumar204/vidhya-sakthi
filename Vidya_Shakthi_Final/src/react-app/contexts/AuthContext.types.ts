@@ -3,12 +3,13 @@ import { createContext } from 'react';
 export type UserRole = 'mentor' | 'mentee' | 'reviewer' | 'state_admin' | 'super_admin';
 
 export interface User {
-  // id: string;
-  // name: string;
+  id: string;
+  name: string;
   email: string;
   role: UserRole;
   avatar?: string;
-  password: string;
+  password?: string;
+  token?: string;  
 }
 
 export interface AuthContextType {

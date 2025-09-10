@@ -6,7 +6,99 @@ import generateToken from '../utils/generateToken';
 import { EmailPasswordRegisterSchema, EmailPasswordLoginSchema, UserRegistrationSchema } from '../shared/types';
 import { Types } from 'mongoose';
 import { getGoogleOAuthTokens, getGoogleUser } from '../services/google.service';
- 
+import { sendOtpEmail } from '../services/mail.service';
+
+// In-memory OTP store for dev/demo. Replace with DB/cache in prod.
+type OtpRecord = { otp: string; expiresAt: number; purpose: 'register' | 'reset' };
+const emailToOtp = new Map<string, OtpRecord>();
+
+export const checkUser = asyncHandler(async (req: Request, res: Response) => {
+  const email = String(req.query.email || '').toLowerCase();
+  if (!email) {
+    res.status(400);
+    throw new Error('Email is required');
+  }
+  const user = await User.findOne({ email }).select('_id').lean();
+  res.json({ exists: !!user });
+});
+
+export const sendOtp = asyncHandler(async (req: Request, res: Response) => {
+  const { email, purpose } = req.body as { email?: string; purpose?: 'register' | 'reset' };
+  if (!email || !purpose) {
+    res.status(400);
+    throw new Error('Email and purpose are required');
+  }
+  const normalized = email.toLowerCase();
+  const otp = (Math.floor(100000 + Math.random() * 900000)).toString();
+  const expiresAt = Date.now() + 5 * 60 * 1000;
+  emailToOtp.set(normalized, { otp, expiresAt, purpose });
+  try {
+    await sendOtpEmail(normalized, otp, purpose);
+    res.json({ message: 'OTP sent', ttlSeconds: 300 });
+  } catch (e) {
+    emailToOtp.delete(normalized);
+    res.status(500);
+    throw new Error('Failed to send OTP email');
+  }
+});
+
+export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
+  const { email, otp, purpose } = req.body as { email?: string; otp?: string; purpose?: 'register' | 'reset' };
+  if (!email || !otp) {
+    res.status(400);
+    throw new Error('Email and OTP are required');
+  }
+  const normalized = email.toLowerCase();
+  const record = emailToOtp.get(normalized);
+  if (!record) {
+    res.status(400);
+    throw new Error('OTP not found');
+  }
+  if (purpose && record.purpose !== purpose) {
+    res.status(400);
+    throw new Error('OTP purpose mismatch');
+  }
+  if (Date.now() > record.expiresAt) {
+    res.status(400);
+    throw new Error('OTP expired');
+  }
+  if (record.otp !== otp) {
+    res.status(400);
+    throw new Error('Invalid OTP');
+  }
+  res.json({ verified: true });
+});
+
+export const resetPassword = asyncHandler(async (req: Request, res: Response) => {
+  const { email, otp, newPassword } = req.body as { email?: string; otp?: string; newPassword?: string };
+  if (!email || !otp || !newPassword) {
+    res.status(400);
+    throw new Error('Email, OTP and newPassword are required');
+  }
+  const normalized = email.toLowerCase();
+  const record = emailToOtp.get(normalized);
+  if (!record || record.purpose !== 'reset') {
+    res.status(400);
+    throw new Error('OTP invalid or not for reset');
+  }
+  if (Date.now() > record.expiresAt) {
+    res.status(400);
+    throw new Error('OTP expired');
+  }
+  if (record.otp !== otp) {
+    res.status(400);
+    throw new Error('Invalid OTP');
+  }
+  const user = await User.findOne({ email: normalized }).exec() as IUser | null;
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+  user.password_hash = newPassword; // pre-save hook hashes
+  await user.save();
+  emailToOtp.delete(normalized);
+  res.json({ message: 'Password reset successful' });
+});
 /**
  * @desc    Register a new user with email/password
  * @route   POST /api/auth/register

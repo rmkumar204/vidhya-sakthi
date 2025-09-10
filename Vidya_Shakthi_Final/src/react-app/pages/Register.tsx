@@ -115,52 +115,58 @@ export default function Register() {
     }
   };
 
-  // Email existence check
-  const handleVerifyUser = async () => {
-    setErrors({});
-    // basic email validation
-    if (!verifyEmail.trim()) {
-      setErrors({ verifyEmail: 'Email is required' });
+
+// Check user and send OTP
+const handleVerifyUser = async () => {
+  setErrors({});
+  if (!verifyEmail.trim()) { setErrors({ verifyEmail: 'Email is required' }); return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(verifyEmail)) { setErrors({ verifyEmail: 'Please enter a valid email address' }); return; }
+
+  setIsCheckingUser(true);
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/check-user?email=${encodeURIComponent(verifyEmail)}`);
+    const data = await res.json();
+    if (data.exists) {
+      setErrors({ success: 'User already exists. Redirecting to login...' });
+      setTimeout(() => navigate(`/login/${role}`), 1500);
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(verifyEmail)) {
-      setErrors({ verifyEmail: 'Please enter a valid email address' });
-      return;
-    }
+    setIsSendingOtp(true);
+    await fetch(`${API_BASE_URL}/auth/send-otp`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: verifyEmail, purpose: 'register' })
+    });
+    setErrors({ success: 'OTP sent successfully! Please check your email.' });
+    setTimeout(() => { setErrors({}); setPhase('verifyOtp'); }, 1000);
+  } catch {
+    setErrors({ verifyEmail: 'Failed to verify user. Please try again.' });
+  } finally {
+    setIsSendingOtp(false); setIsCheckingUser(false);
+  }
+};
 
-    setIsCheckingUser(true);
-    try {
-      // TODO: call API to check user existence
-      // const res = await fetch(`${API_BASE_URL}/auth/check-user?email=${encodeURIComponent(verifyEmail)}`)
-      // const data = await res.json();
-      // const exists = data.exists;
-      const exists = false; // simulate: change to actual API result
+// Verify OTP
+const handleVerifyOtp = async () => {
+  setErrors({});
+  const otpString = otp.join('');
+  if (otpString.length !== 6) { setErrors({ otp: 'Please enter all 6 digits' }); return; }
+  setIsVerifyingOtp(true);
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/verify-otp`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: verifyEmail, otp: otpString, purpose: 'register' })
+    });
+    if (!res.ok) throw new Error();
+    setErrors({ success: 'OTP verified successfully!' });
+    setTimeout(() => { setErrors({}); setPhase('form'); }, 800);
+  } catch {
+    setErrors({ otp: 'Invalid OTP. Please try again.' });
+  } finally {
+    setIsVerifyingOtp(false);
+  }
+};
 
-      if (exists) {
-        setErrors({ success: 'User already exists. Redirecting to login...' });
-        setTimeout(() => {
-          navigate(`/login/${role}`);
-        }, 2000);
-        return;
-      }
-
-      // Send OTP for new user
-      setIsSendingOtp(true);
-      // TODO: call API to send OTP
-      await new Promise((r) => setTimeout(r, 1500));
-      setErrors({ success: 'OTP sent successfully! Please check your email.' });
-      setTimeout(() => {
-        setErrors({});
-        setPhase('verifyOtp');
-      }, 1500);
-    } catch {
-      setErrors({ verifyEmail: 'Failed to verify user. Please try again.' });
-    } finally {
-      setIsSendingOtp(false);
-      setIsCheckingUser(false);
-    }
-  };
-
+  
   const handleOtpChange = (index: number, value: string) => {
     if (value.length > 1) return;
     const next = [...otp];
@@ -177,32 +183,7 @@ export default function Register() {
     }
   };
 
-  const handleVerifyOtp = async () => {
-    setErrors({});
-    const otpString = otp.join('');
-    if (otpString.length !== 6) {
-      setErrors({ otp: 'Please enter all 6 digits' });
-      return;
-    }
-    setIsVerifyingOtp(true);
-    try {
-      // TODO: call API to verify OTP
-      await new Promise((r) => setTimeout(r, 1200));
-      setErrors({ success: 'OTP verified successfully!' });
-      // Pre-fill email-derived info if needed; proceed to form phase
-      setTimeout(() => {
-        setErrors({});
-        setPhase('form');
-        // Optionally fetch and prefill existing partial details
-        // TODO: fetch existing details by email if available
-      }, 1000);
-    } catch {
-      setErrors({ otp: 'Invalid OTP. Please try again.' });
-    } finally {
-      setIsVerifyingOtp(false);
-    }
-  };
-
+ 
   const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const nextStep = () => {
@@ -229,39 +210,61 @@ export default function Register() {
 
   const handleSubmit = async () => {
     if (!validateStep(currentStep)) return;
-    
     setIsSubmitting(true);
-    
+  
     try {
+      // 1) Register user to get token (email from verifyEmail, password in personalData)
+      const regRes = await fetch(`${API_BASE_URL}/auth/register`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: verifyEmail, password: personalData.password, role })
+      });
+  
+      if (!regRes.ok) {
+        const msg = await regRes.text();
+        setErrors({ submit: msg || 'Registration failed' });
+        setIsSubmitting(false);
+        return;
+      }
+      const regData = await regRes.json();
+      const token = regData.token;
+  
+      // 2) Complete registration with profile details
       const registrationData = {
-        // email: user?.email || '',
         role: role as UserRoleType,
-        personal: personalData,
+        personal: {
+          first_name: personalData.first_name,
+          middle_name: personalData.middle_name,
+          last_name: personalData.last_name,
+          mobile_number: personalData.mobile_number,
+          date_of_birth: personalData.date_of_birth,
+          state: personalData.state,
+          district: personalData.district,
+          block: personalData.block,
+          place_city: personalData.place_city,
+          pin_code: personalData.pin_code
+        },
         educational: educationalData,
         preferences: preferencesData
       };
-
-      const response = await fetch(`${API_BASE_URL}/users/register`, {
+  
+      const compRes = await fetch(`${API_BASE_URL}/auth/complete-registration`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(registrationData),
       });
-
-      if (response.ok) {
+  
+      if (compRes.ok) {
         navigate('/app/dashboard');
       } else {
-        const data = await response.json();
-        setErrors({ submit: data.error || 'Registration failed' });
+        const data = await compRes.json();
+        setErrors({ submit: data.error || 'Registration completion failed' });
       }
-    } catch (err) {
+    } catch {
       setErrors({ submit: 'Registration failed. Please try again.' });
     } finally {
       setIsSubmitting(false);
     }
   };
-
   const handleBack = () => {
     if (phase === 'verifyEmail') {
       navigate(`/login/${role}`);

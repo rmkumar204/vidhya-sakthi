@@ -65,7 +65,7 @@ export default function Login() {
   const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   const roleInfo = role ? roleDescriptions[role] : null;
-
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
   useEffect(() => {
     if (user && !isPending) {
       navigate('/app/dashboard');
@@ -244,22 +244,19 @@ export default function Login() {
     setIsVerifyingOTP(true);
     
     try {
-      // TODO: Implement actual OTP verification logic here
-      // For now, we'll simulate the API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Show success message and then show reset password form
+      const res = await fetch(`${API_BASE_URL}/auth/verify-otp`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotPasswordEmail, otp: otp.join(''), purpose: 'reset' })
+      });
+      if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(msg || 'OTP verification failed');
+      }
       setErrors({ success: 'OTP verified successfully! You can now reset your password.' });
-      
-      // After showing success message, hide OTP verification and show reset password
-      setTimeout(() => {
-        setOtp(['', '', '', '', '', '']);
-        setShowOTPVerification(false);
-        setShowResetPassword(true);
-        setErrors({});
-      }, 2000);
-      
-    } catch {
+      setOtp(['', '', '', '', '', '']);
+      setShowOTPVerification(false);
+      setShowResetPassword(true);
+    } catch (err) {
       setErrors({ otp: 'Invalid OTP. Please try again.' });
     } finally {
       setIsVerifyingOTP(false);
@@ -313,23 +310,20 @@ export default function Login() {
     setIsResettingPassword(true);
     
     try {
-      // TODO: Implement actual password reset logic here
-      // For now, we'll simulate the API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Show success message and redirect back to login
+      const res = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotPasswordEmail, otp: otp.join(''), newPassword: resetPasswordData.newPassword })
+      });
+      if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(msg || 'Failed to reset password');
+      }
       setErrors({ success: 'Password reset successfully! You can now login with your new password.' });
-      
-      // Reset form and redirect back to login after successful password reset
-      setTimeout(() => {
-        setResetPasswordData({ newPassword: '', confirmPassword: '' });
-        setShowResetPassword(false);
-        setShowForgotPassword(false);
-        setForgotPasswordEmail('');
-        setErrors({});
-      }, 3000);
-      
-    } catch {
+      setResetPasswordData({ newPassword: '', confirmPassword: '' });
+      setShowResetPassword(false);
+      setShowForgotPassword(false);
+      setForgotPasswordEmail('');
+    } catch (err) {
       setErrors({ resetPassword: 'Failed to reset password. Please try again.' });
     } finally {
       setIsResettingPassword(false);
@@ -355,21 +349,34 @@ export default function Login() {
     setIsSendingOTP(true);
     
     try {
-      // TODO: Implement actual OTP sending logic here
-      // For now, we'll simulate the API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Show success message first
+      // Ensure user exists before sending reset OTP
+      const chk = await fetch(`${API_BASE_URL}/auth/check-user?email=${encodeURIComponent(forgotPasswordEmail)}`);
+      const chkJson = await chk.json();
+      if (!chk.ok || !chkJson.exists) {
+        setErrors({ forgotPassword: 'No account found for this email. Please register...' });
+        // Return to login content
+        setTimeout(() => {
+          setShowForgotPassword(false);
+          setShowOTPVerification(false);
+          setShowResetPassword(false);
+          setOtp(['', '', '', '', '', '']);
+          setResetPasswordData({ newPassword: '', confirmPassword: '' });
+          setLoginMethod('email');
+        },1500)
+        return;
+      }
+      const res = await fetch(`${API_BASE_URL}/auth/send-otp`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotPasswordEmail, purpose: 'reset' })
+      });
+      if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(msg || 'Failed to send OTP');
+      }
       setErrors({ success: 'OTP sent successfully! Please check your email.' });
-      
-      // After showing success message, hide forgot password and show OTP verification
-      setTimeout(() => {
-        setShowForgotPassword(false);
-        setShowOTPVerification(true);
-        setErrors({});
-      }, 2000);
-      
-    } catch {
+      setShowForgotPassword(false);
+      setShowOTPVerification(true);
+    } catch (err) {
       setErrors({ forgotPassword: 'Failed to send OTP. Please try again.' });
     } finally {
       setIsSendingOTP(false);

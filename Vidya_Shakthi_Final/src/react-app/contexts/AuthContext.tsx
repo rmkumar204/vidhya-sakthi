@@ -12,23 +12,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
 
   /** ✅ Save user in state + localStorage */
-  const login = (userData: User) => {
-    // setUser(userData);
-    setUser({
-      id: "12345",
-      name: "Ram Kumar",
-      email: "ramkumar@example.com",
-      role: "mentee",
-      avatar: '🧑‍🏫'
-    });
-    // localStorage.setItem("user", JSON.stringify(userData));
-    localStorage.setItem("user",JSON.stringify({
-      id: "12345",
-      name: "Ram Kumar",
-      email: "ramkumar@example.com",
-      role: "mentee",
-      avatar: '🧑‍🏫'
-    }))
+   const login = (userData: User) => {
+      setUser(userData);
+      localStorage.setItem("user", JSON.stringify(userData)); 
   };
 
   /** ✅ Clear user + token and send back to role selection/login */

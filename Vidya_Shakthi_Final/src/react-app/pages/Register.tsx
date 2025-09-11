@@ -8,7 +8,7 @@ import RegistrationStepper from '@/react-app/components/RegistrationStepper';
 import PersonalDetailsStep from '@/react-app/components/PersonalDetailsStep';
 import EducationalDetailsStep from '@/react-app/components/EducationalDetailsStep';
 import PreferencesStep from '@/react-app/components/PreferencesStep';
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Mail, Send } from 'lucide-react';
 
 const roleInfo: Record<string, { title: string; icon: string; color: string }> = {
   mentor: { title: 'Mentor Registration', icon: '🎓', color: 'blue' },
@@ -34,9 +34,17 @@ export default function Register() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Pre-step: verify email and OTP flow
+  type Phase = 'verifyEmail' | 'verifyOtp' | 'form';
+  const [phase, setPhase] = useState<Phase>('verifyEmail');
+  const [verifyEmail, setVerifyEmail] = useState('');
+  const [isCheckingUser, setIsCheckingUser] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+
   // Form data state
   const [personalData, setPersonalData] = useState<PersonalDetailsType>({
-    email: '',
     first_name: '',
     middle_name: '',
     last_name: '',
@@ -46,7 +54,8 @@ export default function Register() {
     district: '',
     block: '',
     place_city: '',
-    pin_code: ''
+    pin_code: '',
+    password: ''
   });
 
   const [educationalData, setEducationalData] = useState<EducationalDetailsType>({
@@ -55,6 +64,7 @@ export default function Register() {
     languages: [{ language: '', can_read: false, can_write: false, can_speak: false, can_understand: false }]
   });
 
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
   const [preferencesData, setPreferencesData] = useState<PreferencesType>({
     max_hours_per_week: undefined,
     skills_interests: [],
@@ -74,6 +84,17 @@ export default function Register() {
       switch (step) {
         case 'personal':
           PersonalDetailsSchema.parse(personalData);
+          // Role-based age validation
+          if (personalData.date_of_birth) {
+            const today = new Date();
+            const dob = new Date(personalData.date_of_birth);
+            const age = today.getFullYear() - dob.getFullYear() - (today < new Date(today.getFullYear(), dob.getMonth(), dob.getDate()) ? 1 : 0);
+            const roleMinAge = role === 'mentee' ? 14 : (role === 'mentor' || role === 'reviewer' ? 18 : 18);
+            if (isNaN(age) || age < roleMinAge) {
+              setErrors({ date_of_birth: `Minimum age is ${roleMinAge} years for this role` });
+              return false;
+            }
+          }
           break;
         case 'educational':
           EducationalDetailsSchema.parse(educationalData);
@@ -94,8 +115,81 @@ export default function Register() {
     }
   };
 
+
+// Check user and send OTP
+const handleVerifyUser = async () => {
+  setErrors({});
+  if (!verifyEmail.trim()) { setErrors({ verifyEmail: 'Email is required' }); return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(verifyEmail)) { setErrors({ verifyEmail: 'Please enter a valid email address' }); return; }
+
+  setIsCheckingUser(true);
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/check-user?email=${encodeURIComponent(verifyEmail)}`);
+    const data = await res.json();
+    if (data.exists) {
+      setErrors({ success: 'User already exists. Redirecting to login...' });
+      setTimeout(() => navigate(`/login/${role}`), 1500);
+      return;
+    }
+    setIsSendingOtp(true);
+    await fetch(`${API_BASE_URL}/auth/send-otp`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: verifyEmail, purpose: 'register' })
+    });
+    setErrors({ success: 'OTP sent successfully! Please check your email.' });
+    setTimeout(() => { setErrors({}); setPhase('verifyOtp'); }, 1000);
+  } catch {
+    setErrors({ verifyEmail: 'Failed to verify user. Please try again.' });
+  } finally {
+    setIsSendingOtp(false); setIsCheckingUser(false);
+  }
+};
+
+// Verify OTP
+const handleVerifyOtp = async () => {
+  setErrors({});
+  const otpString = otp.join('');
+  if (otpString.length !== 6) { setErrors({ otp: 'Please enter all 6 digits' }); return; }
+  setIsVerifyingOtp(true);
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/verify-otp`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: verifyEmail, otp: otpString, purpose: 'register' })
+    });
+    if (!res.ok) throw new Error();
+    setErrors({ success: 'OTP verified successfully!' });
+    setTimeout(() => { setErrors({}); setPhase('form'); }, 800);
+  } catch {
+    setErrors({ otp: 'Invalid OTP. Please try again.' });
+  } finally {
+    setIsVerifyingOtp(false);
+  }
+};
+
+  
+  const handleOtpChange = (index: number, value: string) => {
+    if (value.length > 1) return;
+    const next = [...otp];
+    next[index] = value.replace(/\D/g, '');
+    setOtp(next);
+    if (value && index < 5) {
+      document.getElementById(`reg-otp-${index + 1}`)?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      document.getElementById(`reg-otp-${index - 1}`)?.focus();
+    }
+  };
+
+ 
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+
   const nextStep = () => {
+    setSubmitAttempted(true);
     if (!validateStep(currentStep)) return;
+    setSubmitAttempted(false);
     
     if (!completedSteps.includes(currentStep)) {
       setCompletedSteps([...completedSteps, currentStep]);
@@ -116,41 +210,72 @@ export default function Register() {
 
   const handleSubmit = async () => {
     if (!validateStep(currentStep)) return;
-    
     setIsSubmitting(true);
-    
+  
     try {
+      // 1) Register user to get token (email from verifyEmail, password in personalData)
+      const regRes = await fetch(`${API_BASE_URL}/auth/register`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: verifyEmail, password: personalData.password, role })
+      });
+  
+      if (!regRes.ok) {
+        const msg = await regRes.text();
+        setErrors({ submit: msg || 'Registration failed' });
+        setIsSubmitting(false);
+        return;
+      }
+      const regData = await regRes.json();
+      const token = regData.token;
+  
+      // 2) Complete registration with profile details
       const registrationData = {
-        email: user?.email || '',
         role: role as UserRoleType,
-        personal: personalData,
+        personal: {
+          first_name: personalData.first_name,
+          middle_name: personalData.middle_name,
+          last_name: personalData.last_name,
+          mobile_number: personalData.mobile_number,
+          date_of_birth: personalData.date_of_birth,
+          state: personalData.state,
+          district: personalData.district,
+          block: personalData.block,
+          place_city: personalData.place_city,
+          pin_code: personalData.pin_code
+        },
         educational: educationalData,
         preferences: preferencesData
       };
-
-      const response = await fetch('/api/users/register', {
+  
+      const compRes = await fetch(`${API_BASE_URL}/auth/complete-registration`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(registrationData),
       });
-
-      if (response.ok) {
-        navigate('/app/dashboard');
+  
+      if (compRes.ok) {
+        navigate(`/login/${role}`);
       } else {
-        const data = await response.json();
-        setErrors({ submit: data.error || 'Registration failed' });
+        const data = await compRes.json();
+        setErrors({ submit: data.error || 'Registration completion failed' });
       }
-    } catch (err) {
+    } catch {
       setErrors({ submit: 'Registration failed. Please try again.' });
     } finally {
       setIsSubmitting(false);
     }
   };
-
   const handleBack = () => {
-    navigate(`/login/${role}`);
+    if (phase === 'verifyEmail') {
+      navigate(`/login/${role}`);
+    } else if (phase === 'verifyOtp') {
+      // go back to email input
+      setPhase('verifyEmail');
+      setOtp(['', '', '', '', '', '']);
+      setErrors({});
+    } else {
+      navigate(`/login/${role}`);
+    }
   };
 
   if (!role || !roleInfo[role]) {
@@ -196,12 +321,110 @@ export default function Register() {
 
           {/* Registration Card */}
           <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border border-white/20 dark:border-gray-700/20">
-            {/* Stepper */}
-            <RegistrationStepper
-              currentStep={currentStep}
-              completedSteps={completedSteps}
-              steps={steps}
-            />
+            {/* Pre-step: Verify Email */}
+            {phase === 'verifyEmail' && (
+              <div className="max-w-xl mx-auto">
+                <div className="text-center mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Verify Email</h2>
+                  <p className="text-gray-600 dark:text-gray-300">Enter your email to verify if you are a new user.</p>
+                </div>
+                {errors.success && (
+                  <div className="bg-green-100 dark:bg-green-900/20 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg mb-4">{errors.success}</div>
+                )}
+                {errors.verifyEmail && (
+                  <div className="bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg mb-4">{errors.verifyEmail}</div>
+                )}
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email Address</label>
+                <div className="relative mb-4">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="email"
+                    value={verifyEmail}
+                    onChange={(e) => {
+                      setVerifyEmail(e.target.value);
+                      if (errors.verifyEmail) setErrors({ ...errors, verifyEmail: '' });
+                    }}
+                    className={`w-full pl-10 pr-4 py-3 rounded-lg border ${errors.verifyEmail ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100`}
+                    placeholder="Enter your email"
+                    disabled={isCheckingUser || isSendingOtp}
+                  />
+                </div>
+                <button
+                  onClick={handleVerifyUser}
+                  disabled={isCheckingUser || isSendingOtp}
+                  className={`w-full bg-gradient-to-r from-${currentRoleInfo.color}-500 to-${currentRoleInfo.color}-700 text-white font-semibold py-3 px-6 rounded-xl hover:shadow-lg transform hover:scale-105 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  {(isCheckingUser || isSendingOtp) ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" /> Verify User
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* Pre-step: Verify OTP */}
+            {phase === 'verifyOtp' && (
+              <div className="max-w-xl mx-auto">
+                <div className="text-center mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Verify OTP</h2>
+                  <p className="text-gray-600 dark:text-gray-300">Enter the 6-digit OTP sent to <span className="font-semibold">{verifyEmail}</span></p>
+                </div>
+                {errors.otp && (
+                  <div className="bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg mb-4">{errors.otp}</div>
+                )}
+                {errors.success && (
+                  <div className="bg-green-100 dark:bg-green-900/20 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg mb-4">{errors.success}</div>
+                )}
+                <div className="flex justify-center gap-3 mb-6">
+                  {otp.map((d, i) => (
+                    <input
+                      key={i}
+                      id={`reg-otp-${i}`}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={1}
+                      value={d}
+                      onChange={(e) => handleOtpChange(i, e.target.value)}
+                      onKeyDown={(e) => handleOtpKeyDown(i, e)}
+                      className="w-12 h-12 text-center text-xl font-bold rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      disabled={isVerifyingOtp}
+                    />
+                  ))}
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setPhase('verifyEmail')}
+                    className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold py-3 px-6 rounded-xl hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
+                    disabled={isVerifyingOtp}
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={handleVerifyOtp}
+                    disabled={isVerifyingOtp || otp.join('').length !== 6}
+                    className={`flex-1 bg-gradient-to-r from-${currentRoleInfo.color}-500 to-${currentRoleInfo.color}-700 text-white font-semibold py-3 px-6 rounded-xl hover:shadow-lg transform hover:scale-105 transition-all disabled:opacity-50`}
+                  >
+                    {isVerifyingOtp ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    ) : (
+                      <>Verify OTP</>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+            {/* Stepper - only show after OTP verified */}
+            {phase === 'form' && (
+              <RegistrationStepper
+                currentStep={currentStep}
+                completedSteps={completedSteps}
+                steps={steps}
+              />
+            )}
 
             {/* Error Messages */}
             {errors.submit && (
@@ -211,73 +434,78 @@ export default function Register() {
             )}
 
             {/* Step Content */}
-            <div className="min-h-[500px]">
-              {currentStep === 'personal' && (
-                <PersonalDetailsStep
-                  data={personalData}
-                  onChange={setPersonalData}
-                  errors={errors}
-                />
-              )}
-              {currentStep === 'educational' && (
-                <EducationalDetailsStep
-                  data={educationalData}
-                  onChange={setEducationalData}
-                  errors={errors}
-                />
-              )}
-              {currentStep === 'preferences' && (
-                <PreferencesStep
-                  data={preferencesData}
-                  onChange={setPreferencesData}
-                  errors={errors}
-                  role={role}
-                />
-              )}
-            </div>
+            {phase === 'form' && (
+              <div className="min-h-[500px]">
+                {currentStep === 'personal' && (
+                  <PersonalDetailsStep
+                    data={personalData}
+                    onChange={setPersonalData}
+                    errors={errors}
+                    submitAttempted={submitAttempted}
+                  />
+                )}
+                {currentStep === 'educational' && (
+                  <EducationalDetailsStep
+                    data={educationalData}
+                    onChange={setEducationalData}
+                    errors={errors}
+                  />
+                )}
+                {currentStep === 'preferences' && (
+                  <PreferencesStep
+                    data={preferencesData}
+                    onChange={setPreferencesData}
+                    errors={errors}
+                    role={role}
+                  />
+                )}
+              </div>
+            )}
 
             {/* Navigation Buttons */}
-            <div className="flex justify-between mt-8">
-              <button
-                type="button"
-                onClick={prevStep}
-                disabled={currentStep === 'personal'}
-                className="flex items-center gap-2 px-6 py-3 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Previous
-              </button>
+            {phase === 'form' && (
+              <div className="flex justify-between mt-8">
+                <button
+                  type="button"
+                  onClick={prevStep}
+                  disabled={currentStep === 'personal'}
+                  className="flex items-center gap-2 px-6 py-3 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Previous
+                </button>
 
-              {isLastStep ? (
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className={`flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-${currentRoleInfo.color}-500 to-${currentRoleInfo.color}-700 text-white font-semibold rounded-xl hover:shadow-lg transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Registering...
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-4 h-4" />
-                      Complete Registration
-                    </>
-                  )}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={nextStep}
-                  className={`flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-${currentRoleInfo.color}-500 to-${currentRoleInfo.color}-700 text-white font-semibold rounded-xl hover:shadow-lg transform hover:scale-105 transition-all duration-300`}
-                >
-                  Next
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              )}
-            </div>
+                {isLastStep ? (
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={isSubmitting}
+                    className={`flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-${currentRoleInfo.color}-500 to-${currentRoleInfo.color}-700 text-white font-semibold rounded-xl hover:shadow-lg transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Registering...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4" />
+                        Complete Registration
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={nextStep}
+                    className={`flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-${currentRoleInfo.color}-500 to-${currentRoleInfo.color}-700 text-white font-semibold rounded-xl hover:shadow-lg transform hover:scale-105 transition-all duration-300`}
+                  >
+                    Next
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -11,17 +11,33 @@ export type RegistrationStepType = z.infer<typeof RegistrationStep>;
 
 // User registration schema - split into steps
 export const PersonalDetailsSchema = z.object({
-  email: z.string().email(),
   first_name: z.string().min(1, "First name is required"),
   middle_name: z.string().optional(),
   last_name: z.string().min(1, "Last name is required"),
-  mobile_number: z.string().min(10, "Valid mobile number is required"),
-  date_of_birth: z.string(),
+  // Indian mobile number: exactly 10 digits, starting 6-9
+  mobile_number: z.string()
+    .regex(/^[6-9][0-9]{9}$/, "Enter a valid 10-digit Indian mobile number"),
+  date_of_birth: z.string()
+    .min(1, "Date of birth is required")
+    .refine((v) => {
+      const d = new Date(v);
+      return !isNaN(d.getTime());
+    }, { message: "Enter a valid date" })
+    .refine((v) => {
+      const d = new Date(v);
+      const today = new Date();
+      return d <= today;
+    }, { message: "Date of birth cannot be in the future" }),
   state: z.string().min(1, "State is required"),
   district: z.string().min(1, "District is required"),
   block: z.string().min(1, "Block is required"),
   place_city: z.string().min(1, "Place/City is required"),
   pin_code: z.string().min(6, "Valid PIN code is required"),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .refine((val) => /[a-z]/.test(val), { message: "Password must contain a lowercase letter" })
+    .refine((val) => /[A-Z]/.test(val), { message: "Password must contain an uppercase letter" })
+    .refine((val) => /\d/.test(val), { message: "Password must contain a number" }),
 });
 
 export const EducationalDetailsSchema = z.object({

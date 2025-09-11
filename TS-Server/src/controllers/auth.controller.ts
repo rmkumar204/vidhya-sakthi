@@ -2,15 +2,12 @@ import asyncHandler from 'express-async-handler';
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import User, { IUser } from '../models/user.model';
+import Otp, { IOtp } from '../models/otp.model';
 import generateToken from '../utils/generateToken';
 import { EmailPasswordRegisterSchema, EmailPasswordLoginSchema, UserRegistrationSchema } from '../shared/types';
 import { Types } from 'mongoose';
 import { getGoogleOAuthTokens, getGoogleUser } from '../services/google.service';
 import { sendOtpEmail } from '../services/mail.service';
-
-// In-memory OTP store for dev/demo. Replace with DB/cache in prod.
-type OtpRecord = { otp: string; expiresAt: number; purpose: 'register' | 'reset' };
-const emailToOtp = new Map<string, OtpRecord>();
 
 export const checkUser = asyncHandler(async (req: Request, res: Response) => {
   const email = String(req.query.email || '').toLowerCase();
@@ -30,13 +27,25 @@ export const sendOtp = asyncHandler(async (req: Request, res: Response) => {
   }
   const normalized = email.toLowerCase();
   const otp = (Math.floor(100000 + Math.random() * 900000)).toString();
-  const expiresAt = Date.now() + 5 * 60 * 1000;
-  emailToOtp.set(normalized, { otp, expiresAt, purpose });
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes from now
+  
   try {
+    // Delete any existing OTP for this email and purpose
+    await Otp.deleteMany({ email: normalized, purpose });
+    
+    // Create new OTP record
+    await Otp.create({
+      email: normalized,
+      otp,
+      purpose,
+      expiresAt
+    });
+    
     await sendOtpEmail(normalized, otp, purpose);
     res.json({ message: 'OTP sent', ttlSeconds: 300 });
   } catch (e) {
-    emailToOtp.delete(normalized);
+    // Clean up OTP record if email sending fails
+    await Otp.deleteMany({ email: normalized, purpose });
     res.status(500);
     throw new Error('Failed to send OTP email');
   }
@@ -49,23 +58,29 @@ export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
     throw new Error('Email and OTP are required');
   }
   const normalized = email.toLowerCase();
-  const record = emailToOtp.get(normalized);
-  if (!record) {
+  
+  // Find the OTP record in MongoDB
+  const otpRecord = await Otp.findOne({ 
+    email: normalized, 
+    otp,
+    expiresAt: { $gt: new Date() } // Only find non-expired OTPs
+  });
+  
+  if (!otpRecord) {
     res.status(400);
-    throw new Error('OTP not found');
+    throw new Error('Invalid or expired OTP');
   }
-  if (purpose && record.purpose !== purpose) {
+  
+  if (purpose && otpRecord.purpose !== purpose) {
     res.status(400);
     throw new Error('OTP purpose mismatch');
   }
-  if (Date.now() > record.expiresAt) {
-    res.status(400);
-    throw new Error('OTP expired');
+  
+  // Only delete OTP for register purpose, keep it for reset purpose until password is actually reset
+  if (otpRecord.purpose === 'register') {
+    await Otp.deleteOne({ _id: otpRecord._id });
   }
-  if (record.otp !== otp) {
-    res.status(400);
-    throw new Error('Invalid OTP');
-  }
+  
   res.json({ verified: true });
 });
 
@@ -76,27 +91,31 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response) =>
     throw new Error('Email, OTP and newPassword are required');
   }
   const normalized = email.toLowerCase();
-  const record = emailToOtp.get(normalized);
-  if (!record || record.purpose !== 'reset') {
+  
+  // Find the OTP record in MongoDB (without expiry check since OTP should already be verified)
+  const otpRecord = await Otp.findOne({ 
+    email: normalized, 
+    otp: String(otp),
+    purpose: 'reset'
+  });
+  
+  if (!otpRecord) {
     res.status(400);
-    throw new Error('OTP invalid or not for reset');
+    throw new Error('Invalid OTP for password reset');
   }
-  if (Date.now() > record.expiresAt) {
-    res.status(400);
-    throw new Error('OTP expired');
-  }
-  if (record.otp !== otp) {
-    res.status(400);
-    throw new Error('Invalid OTP');
-  }
+  
   const user = await User.findOne({ email: normalized }).exec() as IUser | null;
   if (!user) {
     res.status(404);
     throw new Error('User not found');
   }
+  
   user.password_hash = newPassword; // pre-save hook hashes
   await user.save();
-  emailToOtp.delete(normalized);
+  
+  // Delete the OTP after successful password reset
+  await Otp.deleteOne({ _id: otpRecord._id });
+  
   res.json({ message: 'Password reset successful' });
 });
 /**

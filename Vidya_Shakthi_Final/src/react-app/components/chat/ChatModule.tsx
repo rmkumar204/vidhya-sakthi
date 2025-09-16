@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Paperclip, X, Users, MessageCircle } from 'lucide-react';
+import { Users, MessageCircle, Paperclip, Clock, X } from 'lucide-react';
+import MessageInput from '../MessageInput';
+import TypingIndicator from '../TypingIndicator';
 
 interface ChatMessage {
   id: number;
@@ -30,11 +32,16 @@ export default function ChatModule({ userId }: ChatModuleProps) {
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<ChatRoom | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUserTyping, setIsUserTyping] = useState(false);
+  const [scheduledMessages, setScheduledMessages] = useState<Array<{
+    id: string;
+    message: string;
+    files?: File[];
+    scheduledFor: Date;
+    timeoutId?: NodeJS.Timeout;
+  }>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchChatRooms();
@@ -81,16 +88,18 @@ export default function ChatModule({ userId }: ChatModuleProps) {
     }
   };
 
-  const sendMessage = async () => {
-    if (!selectedRoom || (!newMessage.trim() && !selectedFile)) return;
+  const sendMessage = async (messageText: string, files?: File[]) => {
+    if (!selectedRoom || (!messageText.trim() && (!files || files.length === 0))) return;
 
     try {
       const formData = new FormData();
-      formData.append('message_text', newMessage);
+      formData.append('message_text', messageText);
       formData.append('chat_room_id', selectedRoom.id.toString());
       
-      if (selectedFile) {
-        formData.append('file', selectedFile);
+      if (files && files.length > 0) {
+        files.forEach(file => {
+          formData.append('file', file);
+        });
       }
 
       const response = await fetch('/api/chat/messages', {
@@ -99,11 +108,6 @@ export default function ChatModule({ userId }: ChatModuleProps) {
       });
 
       if (response.ok) {
-        setNewMessage('');
-        setSelectedFile(null);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
         fetchMessages(selectedRoom.id);
         fetchChatRooms(); // Update room list with latest message
       }
@@ -112,24 +116,47 @@ export default function ChatModule({ userId }: ChatModuleProps) {
     }
   };
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      // Check file size (max 10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        alert('File size must be less than 10MB');
-        return;
-      }
-      setSelectedFile(file);
+  const handleScheduleMessage = (messageText: string, files: File[] | undefined, scheduledFor: Date) => {
+    console.log('Scheduling message:', { messageText, files, scheduledFor });
+    const messageId = Date.now().toString();
+    
+    // Schedule the actual sending
+    const delay = scheduledFor.getTime() - Date.now();
+    let timeoutId: NodeJS.Timeout | undefined;
+    
+    if (delay > 0) {
+      timeoutId = setTimeout(() => {
+        sendMessage(messageText, files);
+        // Remove from scheduled messages
+        setScheduledMessages(prev => prev.filter(msg => msg.id !== messageId));
+      }, delay);
     }
+    
+    const scheduledMessage = {
+      id: messageId,
+      message: messageText,
+      files: files,
+      scheduledFor: scheduledFor,
+      timeoutId: timeoutId
+    };
+    
+    setScheduledMessages(prev => {
+      const newMessages = [...prev, scheduledMessage];
+      console.log('Updated scheduled messages:', newMessages);
+      return newMessages;
+    });
   };
 
-  const removeSelectedFile = () => {
-    setSelectedFile(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+  const handleCancelScheduledMessage = (messageId: string) => {
+    setScheduledMessages(prev => {
+      const message = prev.find(msg => msg.id === messageId);
+      if (message && message.timeoutId) {
+        clearTimeout(message.timeoutId);
+      }
+      return prev.filter(msg => msg.id !== messageId);
+    });
   };
+
 
   const formatTime = (timestamp: string) => {
     return new Date(timestamp).toLocaleTimeString('en-US', {
@@ -138,13 +165,6 @@ export default function ChatModule({ userId }: ChatModuleProps) {
     });
   };
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
 
   return (
     <div className="h-[600px] bg-white dark:bg-gray-800 rounded-lg shadow-lg flex">
@@ -157,7 +177,7 @@ export default function ChatModule({ userId }: ChatModuleProps) {
           </h3>
         </div>
         
-        <div className="overflow-y-auto h-full">
+        <div className="overflow-y-auto h-full" style={{scrollbarWidth: 'none', msOverflowStyle: 'none'}}>
           {chatRooms.length === 0 ? (
             <div className="p-4 text-center text-gray-500 dark:text-gray-400">
               No chat rooms available
@@ -212,11 +232,16 @@ export default function ChatModule({ userId }: ChatModuleProps) {
               </h4>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 {selectedRoom.type === 'project_group' ? 'Project Group Chat' : 'Direct Message'}
+                {scheduledMessages.length > 0 && (
+                  <span className="ml-2 text-blue-600 dark:text-blue-400">
+                    • {scheduledMessages.length} scheduled
+                  </span>
+                )}
               </p>
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4" style={{scrollbarWidth: 'none', msOverflowStyle: 'none'}}>
               {isLoading ? (
                 <div className="flex justify-center">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
@@ -247,7 +272,10 @@ export default function ChatModule({ userId }: ChatModuleProps) {
                         )}
                         
                         {message.message_type === 'text' ? (
-                          <p className="text-sm">{message.message_text}</p>
+                          <p 
+                            className="text-sm" 
+                            dangerouslySetInnerHTML={{ __html: message.message_text }}
+                          />
                         ) : (
                           <div className="space-y-2">
                             {message.message_text && (
@@ -268,59 +296,92 @@ export default function ChatModule({ userId }: ChatModuleProps) {
                   );
                 })
               )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Message Input */}
-            <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-              {selectedFile && (
-                <div className="mb-2 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Paperclip className="w-4 h-4 text-gray-500" />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                      {selectedFile.name} ({formatFileSize(selectedFile.size)})
-                    </span>
-                  </div>
-                  <button
-                    onClick={removeSelectedFile}
-                    className="text-gray-500 hover:text-red-500 transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+              
+              {/* Scheduled Messages */}
+              {scheduledMessages.length > 0 && (
+                <div className="space-y-2">
+                  {scheduledMessages.map((scheduledMsg) => (
+                    <div key={scheduledMsg.id} className="flex justify-end">
+                      <div className="max-w-xs lg:max-w-md bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg px-4 py-2">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                            <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300">
+                              Scheduled for {scheduledMsg.scheduledFor.toLocaleString()}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => handleCancelScheduledMessage(scheduledMsg.id)}
+                            className="p-1 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                            title="Cancel scheduled message"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                          {scheduledMsg.message}
+                        </p>
+                        {scheduledMsg.files && scheduledMsg.files.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {scheduledMsg.files.map((file, index) => (
+                              <div key={index} className="flex items-center gap-2 p-2 bg-yellow-100 dark:bg-yellow-800/30 rounded">
+                                <Paperclip className="w-3 h-3 text-yellow-600 dark:text-yellow-400" />
+                                <span className="text-xs text-yellow-700 dark:text-yellow-300">
+                                  {file.name}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="mt-3 pt-2 border-t border-yellow-200 dark:border-yellow-700">
+                          <button
+                            onClick={() => handleCancelScheduledMessage(scheduledMsg.id)}
+                            className="w-full px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded-md transition-colors font-medium"
+                          >
+                            Cancel Message
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
               
-              <div className="flex gap-2">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileSelect}
-                  className="hidden"
-                  accept=".pdf,.jpg,.jpeg,.png,.gif,.mp3,.wav,.m4a"
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
-                >
-                  <Paperclip className="w-5 h-5" />
-                </button>
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                  placeholder="Type a message..."
-                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
-                <button
-                  onClick={sendMessage}
-                  disabled={!newMessage.trim() && !selectedFile}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
-              </div>
+              {/* Teams-style Typing Indicator */}
+              {isUserTyping && (
+                <TypingIndicator name="You" isCurrentUser={true} />
+              )}
+              
+              <div ref={messagesEndRef} />
             </div>
+
+            {/* Test Button for Scheduled Messages */}
+            <div className="p-2 border-b border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => {
+                  const testMessage = {
+                    id: Date.now().toString(),
+                    message: "Test scheduled message",
+                    files: undefined,
+                    scheduledFor: new Date(Date.now() + 60000), // 1 minute from now
+                    timeoutId: undefined
+                  };
+                  setScheduledMessages(prev => [...prev, testMessage]);
+                }}
+                className="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
+              >
+                Add Test Scheduled Message
+              </button>
+            </div>
+
+            {/* Message Input */}
+            <MessageInput
+              onSendMessage={sendMessage}
+              onScheduleMessage={handleScheduleMessage}
+              onTyping={setIsUserTyping}
+              placeholder="Type your message..."
+              disabled={isLoading}
+            />
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">

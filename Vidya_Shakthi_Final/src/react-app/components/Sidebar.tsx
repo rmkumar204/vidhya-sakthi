@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router';
+import { NavLink } from 'react-router-dom';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { 
   HomeIcon, 
@@ -15,7 +15,7 @@ import { Settings, LogOut } from 'lucide-react';
 // import { useAuth, UserRole } from '@/react-app/contexts/AuthContext';
 import { useAuth } from '../hooks/useAuth';
 import { UserRole } from '../contexts/AuthContext.types';
-import { useNavigate } from 'react-router';
+// import { useNavigate } from 'react-router-dom';
 
 interface SidebarProps {
   sidebarOpen: boolean;

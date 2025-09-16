@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import { RoleCard as RoleCardType, UserRoleType } from '@/shared/types';
 import RoleCard from '@/react-app/components/RoleCard';
 import ThemeToggle from '@/react-app/components/ThemeToggle';

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useParams, useNavigate } from 'react-router-dom';
 // import { useAuth } from '@/react-app/contexts/AuthContext';
 import { useAuth } from '@/react-app/hooks/useAuth';
 import { UserRoleType, PersonalDetailsSchema, EducationalDetailsSchema, PreferencesSchema, RegistrationStepType, PersonalDetailsType, EducationalDetailsType, PreferencesType } from '@/shared/types';

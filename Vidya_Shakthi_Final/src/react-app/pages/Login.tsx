@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/react-app/hooks/useAuth';
 import { UserRoleType } from '@/shared/types';
 import ThemeToggle from '@/react-app/components/ThemeToggle';
@@ -76,7 +76,14 @@ export default function Login() {
     e.preventDefault();
     setErrors({});
     // setIsLoading(true);
-    login(formData);
+    const userData = {
+      id: "12345",
+      name: "Ram Kumar",
+      email: formData.email,
+      role: role as "mentee" | "mentor" | "state_admin" | "super_admin",
+      avatar: '🧑‍🏫'
+    };
+    login(userData);
   //  localStorage.setItem("user", JSON.stringify({
   //     id: "12345",
   //     name: "Ram Kumar",

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import { AuthContext, User, UserRole } from "./AuthContext.types";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -12,7 +12,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
 
   /** ✅ Save user in state + localStorage */
-  const login = (userData: User) => {
+  const login = (_userData: User) => {
     // setUser(userData);
     setUser({
       id: "12345",

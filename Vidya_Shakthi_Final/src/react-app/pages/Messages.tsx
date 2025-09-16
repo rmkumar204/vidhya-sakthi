@@ -8,6 +8,14 @@ import {
 import TypingIndicator from '@/react-app/components/TypingIndicator';
 import MessageInput from '@/react-app/components/MessageInput';
 import Avatar from '@/react-app/components/Avatar';
+import { AudioCallModal } from '@/react-app/components/AudioCallModal';
+import { VideoCallModal } from '@/react-app/components/VideoCallModal';
+import { VideoCallModalReal } from '@/react-app/components/VideoCallModalReal';
+import { IncomingCallNotification } from '@/react-app/components/IncomingCallNotification';
+import { MediaTest } from '@/react-app/components/MediaTest';
+import { useWebRTCReal } from '@/react-app/hooks/useWebRTCReal';
+import { Call, User } from '@/react-app/types';
+import { performGlobalMediaCleanup } from '@/react-app/utils/mediaCleanup';
 
 // Enhanced utility function to render formatted text like Teams
 const renderFormattedText = (text: string) => {
@@ -179,6 +187,27 @@ export default function Messages() {
   const [language] = useState<'en' | 'ta' | 'hi'>('en');
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const screenShareStreamRef = useRef<MediaStream | null>(null);
+  
+  // Call state
+  const [activeCall, setActiveCall] = useState<Call | null>(null);
+  const [showMediaTest, setShowMediaTest] = useState(false);
+  const [useRealWebRTC, setUseRealWebRTC] = useState(false);
+  const [currentUser] = useState<User>({
+    id: 'current-user',
+    name: 'You',
+    email: 'user@example.com',
+    role: 'mentor',
+    avatar: '👤'
+  });
+
+  // Real WebRTC hook
+  const { 
+    incomingCall, 
+    callStatus,
+    acceptCall,
+    rejectCall,
+    endCall: endRealCall 
+  } = useWebRTCReal();
 
   const filteredChats = chats.filter(chat =>
     chat.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -360,6 +389,49 @@ export default function Messages() {
     }
   };
 
+  // Call handlers
+  const handleStartAudioCall = () => {
+    if (selectedChatData) {
+      const call: Call = {
+        id: `call_${Date.now()}`,
+        type: 'audio',
+        participants: [selectedChatData.id],
+        status: 'initiating',
+        startTime: new Date()
+      };
+      setActiveCall(call);
+    }
+  };
+
+  const handleStartVideoCall = () => {
+    if (selectedChatData) {
+      const call: Call = {
+        id: `call_${Date.now()}`,
+        type: 'video',
+        participants: [selectedChatData.id],
+        status: 'initiating',
+        startTime: new Date()
+      };
+      setActiveCall(call);
+    }
+  };
+
+  const handleEndCall = () => {
+    console.log('Messages: handleEndCall called');
+    setActiveCall(null);
+  };
+
+  const handleCloseCallModal = () => {
+    console.log('Messages: handleCloseCallModal called');
+    setActiveCall(null);
+  };
+
+  const handleForceCleanup = async () => {
+    console.log('Messages: Force cleanup called');
+    await performGlobalMediaCleanup();
+    setActiveCall(null);
+  };
+
   return (
     <div className="h-[calc(100vh-8rem)] flex bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden relative">
       
@@ -469,6 +541,7 @@ export default function Messages() {
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
+                    onClick={handleStartAudioCall}
                     disabled={!selectedChatData.online}
                     title={selectedChatData.online ? 'Start call' : 'User offline'}
                     className={`p-2 rounded-lg transition-colors ${selectedChatData.online ? 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' : 'text-gray-400 cursor-not-allowed'}`}
@@ -476,11 +549,43 @@ export default function Messages() {
                     <PhoneIcon className="h-5 w-5" />
                   </button>
                   <button
+                    onClick={handleStartVideoCall}
                     disabled={!selectedChatData.online}
                     title={selectedChatData.online ? 'Start video' : 'User offline'}
                     className={`p-2 rounded-lg transition-colors ${selectedChatData.online ? 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' : 'text-gray-400 cursor-not-allowed'}`}
                   >
                     <VideoCameraIcon className="h-5 w-5" />
+                  </button>
+                  <button
+                    onClick={() => setShowMediaTest(!showMediaTest)}
+                    title="Test media access"
+                    className="p-2 rounded-lg transition-colors text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={handleForceCleanup}
+                    title="Force stop camera/microphone"
+                    className="p-2 rounded-lg transition-colors text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  >
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setUseRealWebRTC(!useRealWebRTC)}
+                    title={`${useRealWebRTC ? 'Disable' : 'Enable'} real WebRTC calls`}
+                    className={`p-2 rounded-lg transition-colors ${
+                      useRealWebRTC 
+                        ? 'bg-green-500 text-white hover:bg-green-600' 
+                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
                   </button>
                   <button
                     onClick={handleScreenShareClick}
@@ -620,6 +725,64 @@ export default function Messages() {
           </div>
         )}
       </div>
+
+      {/* Media Test Modal */}
+      {showMediaTest && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Media Access Test</h2>
+              <button
+                onClick={() => setShowMediaTest(false)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <MediaTest />
+          </div>
+        </div>
+      )}
+
+      {/* Incoming Call Notification */}
+      {incomingCall && (
+        <IncomingCallNotification
+          from={incomingCall.from}
+          callType={incomingCall.callType}
+          onAccept={acceptCall}
+          onReject={rejectCall}
+        />
+      )}
+
+      {/* Call Modals */}
+      {activeCall && activeCall.type === 'audio' && (
+        <AudioCallModal
+          call={activeCall}
+          user={currentUser}
+          onEndCall={handleEndCall}
+          onClose={handleCloseCallModal}
+        />
+      )}
+
+      {activeCall && activeCall.type === 'video' && useRealWebRTC && (
+        <VideoCallModalReal
+          call={activeCall}
+          user={currentUser}
+          onEndCall={handleEndCall}
+          onClose={handleCloseCallModal}
+        />
+      )}
+
+      {activeCall && activeCall.type === 'video' && !useRealWebRTC && (
+        <VideoCallModal
+          call={activeCall}
+          user={currentUser}
+          onEndCall={handleEndCall}
+          onClose={handleCloseCallModal}
+        />
+      )}
 
     </div>
   );

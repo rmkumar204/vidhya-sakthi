@@ -17,7 +17,7 @@ export default function StatCard({ title, value, change, changeType = 'neutral',
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-colors duration-200">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
@@ -28,7 +28,7 @@ export default function StatCard({ title, value, change, changeType = 'neutral',
             </p>
           )}
         </div>
-        <div className={`p-3 rounded-lg ${iconColor}`}>
+        <div className={`p-3 rounded-lg ${iconColor} transition-transform duration-200 group-hover:rotate-6`}>
           <Icon className="h-6 w-6 text-white" />
         </div>
       </div>

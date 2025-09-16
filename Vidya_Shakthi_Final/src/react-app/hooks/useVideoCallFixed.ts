@@ -22,6 +22,7 @@ export const useVideoCallFixed = () => {
     isAudioEnabled: true,
     isVideoEnabled: true,
     isScreenSharing: false,
+    isSpeakerOn: true,
     callDuration: 0,
     error: null,
   });
@@ -398,6 +399,22 @@ export const useVideoCallFixed = () => {
     }
   }, [callState.isScreenSharing]);
 
+  const toggleSpeaker = useCallback(() => {
+    setCallState(prev => {
+      const newSpeakerState = !prev.isSpeakerOn;
+      console.log('Speaker toggled:', newSpeakerState ? 'ON' : 'OFF');
+      
+      // Here you could implement actual speaker control logic
+      // For now, we're just toggling the state
+      // In a real implementation, you might:
+      // - Control audio output device
+      // - Adjust volume levels
+      // - Switch between speaker and earpiece
+      
+      return { ...prev, isSpeakerOn: newSpeakerState };
+    });
+  }, []);
+
   return {
     callState,
     incomingCall,
@@ -411,5 +428,6 @@ export const useVideoCallFixed = () => {
     toggleAudio,
     toggleVideo,
     toggleScreenShare,
+    toggleSpeaker,
   };
 };

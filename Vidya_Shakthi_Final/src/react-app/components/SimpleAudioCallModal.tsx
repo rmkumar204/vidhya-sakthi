@@ -27,7 +27,8 @@ export const SimpleAudioCallModal: React.FC<SimpleAudioCallModalProps> = ({
     rejectCall,
     endCall, 
     forceCleanup, 
-    toggleAudio
+    toggleAudio,
+    toggleSpeaker
   } = useVideoCallFixed();
 
   // Update time every second
@@ -62,6 +63,11 @@ export const SimpleAudioCallModal: React.FC<SimpleAudioCallModalProps> = ({
   const handleToggleAudio = () => {
     console.log('Toggling audio...');
     toggleAudio();
+  };
+
+  const handleToggleSpeaker = () => {
+    console.log('Toggling speaker...');
+    toggleSpeaker();
   };
 
   const formatDuration = (seconds: number) => {
@@ -193,6 +199,25 @@ export const SimpleAudioCallModal: React.FC<SimpleAudioCallModalProps> = ({
             <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {callState.isAudioEnabled ? (
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+              )}
+            </svg>
+          </button>
+
+          {/* Speaker Toggle */}
+          <button
+            onClick={handleToggleSpeaker}
+            className={`p-3 rounded-full transition-colors ${
+              callState.isSpeakerOn 
+                ? 'bg-white bg-opacity-20 hover:bg-opacity-30' 
+                : 'bg-gray-500 hover:bg-gray-600'
+            }`}
+            title={callState.isSpeakerOn ? 'Turn off speaker' : 'Turn on speaker'}
+          >
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {callState.isSpeakerOn ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
               ) : (
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
               )}

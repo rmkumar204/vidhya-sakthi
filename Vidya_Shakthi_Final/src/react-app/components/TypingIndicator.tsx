@@ -1,11 +1,27 @@
 import Avatar from './Avatar';
+import { getUserProfile, getCurrentUserProfile } from '@/react-app/services/userProfileService';
 
 interface TypingIndicatorProps {
   name: string;
+  userId?: string;
   isCurrentUser?: boolean;
 }
 
-export default function TypingIndicator({ name, isCurrentUser = false }: TypingIndicatorProps) {
+export default function TypingIndicator({ name, userId, isCurrentUser = false }: TypingIndicatorProps) {
+  // Get user avatar from profile
+  const getUserAvatar = (userId?: string): string => {
+    if (isCurrentUser) {
+      const currentUser = getCurrentUserProfile();
+      return currentUser?.avatar || '👤';
+    }
+    if (userId) {
+      const userProfile = getUserProfile(userId);
+      return userProfile?.avatar || '👤';
+    }
+    return '👤';
+  };
+
+  const userAvatar = getUserAvatar(userId);
   return (
     <div className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} items-start space-x-3 mb-2`}>
       {!isCurrentUser && (
@@ -15,6 +31,7 @@ export default function TypingIndicator({ name, isCurrentUser = false }: TypingI
             size="md" 
             online={false}
             showStatus={false}
+            emoji={userAvatar}
           />
         </div>
       )}
@@ -58,6 +75,7 @@ export default function TypingIndicator({ name, isCurrentUser = false }: TypingI
             size="md" 
             online={true}
             showStatus={false}
+            emoji={userAvatar}
           />
         </div>
       )}

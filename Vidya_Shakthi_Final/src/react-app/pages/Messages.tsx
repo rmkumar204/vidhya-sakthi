@@ -12,7 +12,8 @@ import Avatar from '@/react-app/components/Avatar';
 import { RobustVideoCallModal } from '@/react-app/components/RobustVideoCallModal';
 import { SimpleAudioCallModal } from '@/react-app/components/SimpleAudioCallModal';
 import { MediaTest } from '@/react-app/components/MediaTest';
-import { Call, User } from '@/react-app/types';
+import { Call } from '@/react-app/types';
+import { getUserProfile, getCurrentUserProfile, UserProfile } from '@/react-app/services/userProfileService';
 
 // Enhanced utility function to render formatted text like Teams
 const renderFormattedText = (text: string) => {
@@ -85,6 +86,7 @@ interface Chat {
   timestamp: Date;
   unread: number;
   online: boolean;
+  userId: string; // Reference to user profile
 }
 
 const chats: Chat[] = [
@@ -92,6 +94,7 @@ const chats: Chat[] = [
     id: '1',
     name: 'Priya Sharma',
     avatar: '👩‍💻',
+    userId: '1',
     lastMessage: 'Thank you for the feedback on my project!',
     timestamp: new Date(Date.now() - 1000 * 60 * 5),
     unread: 2,
@@ -101,6 +104,7 @@ const chats: Chat[] = [
     id: '2',
     name: 'Rahul Kumar',
     avatar: '👨‍💻',
+    userId: '2',
     lastMessage: 'Can we schedule a call tomorrow?',
     timestamp: new Date(Date.now() - 1000 * 60 * 30),
     unread: 1,
@@ -110,6 +114,7 @@ const chats: Chat[] = [
     id: '3',
     name: 'Anita Patel',
     avatar: '👩‍🎓',
+    userId: '3',
     lastMessage: 'I completed the assignment',
     timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
     unread: 0,
@@ -119,6 +124,7 @@ const chats: Chat[] = [
     id: '4',
     name: 'Vikash Singh',
     avatar: '👨‍🎓',
+    userId: '4',
     lastMessage: 'Great! Looking forward to the next session',
     timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4),
     unread: 0,
@@ -194,13 +200,7 @@ export default function Messages() {
   // Call state
   const [activeCall, setActiveCall] = useState<Call | null>(null);
   const [showMediaTest, setShowMediaTest] = useState(false);
-  const [currentUser] = useState<User>({
-    id: 'current-user',
-    name: 'You',
-    email: 'user@example.com',
-    role: 'mentor',
-    avatar: '👤'
-  });
+  const [currentUser] = useState<UserProfile | null>(getCurrentUserProfile());
 
 
   const filteredChats = chats.filter(chat =>
@@ -208,6 +208,12 @@ export default function Messages() {
   );
 
   const selectedChatData = chats.find(chat => chat.id === selectedChat);
+
+  // Helper function to get user avatar from profile
+  const getUserAvatar = (userId: string): string => {
+    const userProfile = getUserProfile(userId);
+    return userProfile?.avatar || '👤';
+  };
 
   // Cleanup screen sharing on unmount
   useEffect(() => {
@@ -250,7 +256,7 @@ export default function Messages() {
     const sendNow = () => {
       // Send text
       if (hasText) {
-        addMessage({ senderId: 'me', senderName: 'You', senderAvatar: '👤', content: messageText.trim(), type: 'text', isMe: true });
+        addMessage({ senderId: 'me', senderName: 'You', senderAvatar: currentUser?.avatar || '👤', content: messageText.trim(), type: 'text', isMe: true });
         simulateBotReply(messageText.trim());
       }
       // Send files
@@ -262,7 +268,7 @@ export default function Messages() {
           addMessage({
             senderId: 'me',
             senderName: 'You',
-            senderAvatar: '👤',
+            senderAvatar: currentUser?.avatar || '👤',
             content: url,
             type: isImage ? 'image' : (isAudio ? 'audio' : 'file'),
             isMe: true
@@ -328,7 +334,7 @@ export default function Messages() {
         isMe: true,
         senderId: 'current-user',
         senderName: 'You',
-        senderAvatar: '👤'
+        senderAvatar: currentUser?.avatar || '👤'
       });
     } else {
       // Start screen sharing directly
@@ -357,7 +363,7 @@ export default function Messages() {
           isMe: true,
           senderId: 'current-user',
           senderName: 'You',
-          senderAvatar: '👤'
+          senderAvatar: currentUser?.avatar || '👤'
         });
 
         // Handle when user stops sharing via browser UI
@@ -459,14 +465,13 @@ export default function Messages() {
               }`}
             >
               <div className="flex items-center space-x-3">
-                <div className="relative">
-                  <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-lg">
-                    {chat.avatar}
-                  </div>
-                  {chat.online && (
-                    <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></div>
-                  )}
-                </div>
+                <Avatar 
+                  name={chat.name}
+                  size="xl"
+                  online={chat.online}
+                  showStatus={true}
+                  emoji={getUserAvatar(chat.userId)}
+                />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <h3 className="font-medium text-gray-900 dark:text-white truncate">{chat.name}</h3>
@@ -512,14 +517,13 @@ export default function Messages() {
                   >
                     <ArrowLeftIcon className="h-5 w-5" />
                   </button>
-                  <div className="relative">
-                    <div className="h-10 w-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white">
-                      {selectedChatData.avatar}
-                    </div>
-                    {selectedChatData.online && (
-                      <div className="absolute -bottom-1 -right-1 h-3 w-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></div>
-                    )}
-                  </div>
+                  <Avatar 
+                    name={selectedChatData.name}
+                    size="lg"
+                    online={selectedChatData.online}
+                    showStatus={true}
+                    emoji={getUserAvatar(selectedChatData.userId)}
+                  />
                   <div>
                     <h3 className="font-medium text-gray-900 dark:text-white">{selectedChatData.name}</h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -575,7 +579,7 @@ export default function Messages() {
                         size="md" 
                         online={false}
                         showStatus={false}
-                        emoji={message.senderAvatar}
+                        emoji={getUserAvatar(message.senderId)}
                       />
                     </div>
                   )}
@@ -636,7 +640,7 @@ export default function Messages() {
                         size="md" 
                         online={true}
                         showStatus={false}
-                        emoji={message.senderAvatar}
+                        emoji={currentUser?.avatar || '👤'}
                       />
                     </div>
                   )}
@@ -645,23 +649,18 @@ export default function Messages() {
               
               {/* Bot Typing Indicator */}
               {isBotTyping && selectedChatData && (
-                <TypingIndicator name={selectedChatData.name} />
+                <TypingIndicator 
+                  name={selectedChatData.name} 
+                  userId={selectedChatData.userId}
+                />
               )}
 
               {/* User Typing Indicator */}
               {isUserTyping && (
-                <div className="flex justify-end mb-4">
-                  <div className="max-w-xs lg:max-w-md bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl px-4 py-2">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-blue-700 dark:text-blue-200">You are typing</span>
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <TypingIndicator 
+                  name="You" 
+                  isCurrentUser={true}
+                />
               )}
 
             </div>
@@ -710,7 +709,7 @@ export default function Messages() {
 
 
       {/* Call Modals */}
-      {activeCall && activeCall.type === 'audio' && (
+      {activeCall && activeCall.type === 'audio' && currentUser && (
         <SimpleAudioCallModal
           call={activeCall}
           user={currentUser}
@@ -719,7 +718,7 @@ export default function Messages() {
         />
       )}
 
-      {activeCall && activeCall.type === 'video' && (
+      {activeCall && activeCall.type === 'video' && currentUser && (
         <RobustVideoCallModal
           call={activeCall}
           user={currentUser}

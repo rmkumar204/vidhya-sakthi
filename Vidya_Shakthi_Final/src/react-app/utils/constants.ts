@@ -26,6 +26,15 @@ export const MEDIA_CONSTRAINTS = {
     video: false,
   } as MediaStreamConstraints,
 
+  AUDIO_CALL: {
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
+    video: false,
+  } as MediaStreamConstraints,
+
   VIDEO_CALL: {
     audio: {
       echoCancellation: true,

@@ -8,14 +8,10 @@ import {
 import TypingIndicator from '@/react-app/components/TypingIndicator';
 import MessageInput from '@/react-app/components/MessageInput';
 import Avatar from '@/react-app/components/Avatar';
-import { AudioCallModal } from '@/react-app/components/AudioCallModal';
-import { VideoCallModal } from '@/react-app/components/VideoCallModal';
-import { VideoCallModalReal } from '@/react-app/components/VideoCallModalReal';
-import { IncomingCallNotification } from '@/react-app/components/IncomingCallNotification';
+import { RobustVideoCallModal } from '@/react-app/components/RobustVideoCallModal';
+import { SimpleAudioCallModal } from '@/react-app/components/SimpleAudioCallModal';
 import { MediaTest } from '@/react-app/components/MediaTest';
-import { useWebRTCReal } from '@/react-app/hooks/useWebRTCReal';
 import { Call, User } from '@/react-app/types';
-import { performGlobalMediaCleanup } from '@/react-app/utils/mediaCleanup';
 
 // Enhanced utility function to render formatted text like Teams
 const renderFormattedText = (text: string) => {
@@ -191,7 +187,6 @@ export default function Messages() {
   // Call state
   const [activeCall, setActiveCall] = useState<Call | null>(null);
   const [showMediaTest, setShowMediaTest] = useState(false);
-  const [useRealWebRTC, setUseRealWebRTC] = useState(false);
   const [currentUser] = useState<User>({
     id: 'current-user',
     name: 'You',
@@ -200,14 +195,6 @@ export default function Messages() {
     avatar: '👤'
   });
 
-  // Real WebRTC hook
-  const { 
-    incomingCall, 
-    callStatus,
-    acceptCall,
-    rejectCall,
-    endCall: endRealCall 
-  } = useWebRTCReal();
 
   const filteredChats = chats.filter(chat =>
     chat.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -426,11 +413,6 @@ export default function Messages() {
     setActiveCall(null);
   };
 
-  const handleForceCleanup = async () => {
-    console.log('Messages: Force cleanup called');
-    await performGlobalMediaCleanup();
-    setActiveCall(null);
-  };
 
   return (
     <div className="h-[calc(100vh-8rem)] flex bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden relative">
@@ -543,7 +525,7 @@ export default function Messages() {
                   <button
                     onClick={handleStartAudioCall}
                     disabled={!selectedChatData.online}
-                    title={selectedChatData.online ? 'Start call' : 'User offline'}
+                    title={selectedChatData.online ? 'Start audio call' : 'User offline'}
                     className={`p-2 rounded-lg transition-colors ${selectedChatData.online ? 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' : 'text-gray-400 cursor-not-allowed'}`}
                   >
                     <PhoneIcon className="h-5 w-5" />
@@ -551,54 +533,10 @@ export default function Messages() {
                   <button
                     onClick={handleStartVideoCall}
                     disabled={!selectedChatData.online}
-                    title={selectedChatData.online ? 'Start video' : 'User offline'}
+                    title={selectedChatData.online ? 'Start video call' : 'User offline'}
                     className={`p-2 rounded-lg transition-colors ${selectedChatData.online ? 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' : 'text-gray-400 cursor-not-allowed'}`}
                   >
                     <VideoCameraIcon className="h-5 w-5" />
-                  </button>
-                  <button
-                    onClick={() => setShowMediaTest(!showMediaTest)}
-                    title="Test media access"
-                    className="p-2 rounded-lg transition-colors text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  >
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={handleForceCleanup}
-                    title="Force stop camera/microphone"
-                    className="p-2 rounded-lg transition-colors text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                  >
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => setUseRealWebRTC(!useRealWebRTC)}
-                    title={`${useRealWebRTC ? 'Disable' : 'Enable'} real WebRTC calls`}
-                    className={`p-2 rounded-lg transition-colors ${
-                      useRealWebRTC 
-                        ? 'bg-green-500 text-white hover:bg-green-600' 
-                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={handleScreenShareClick}
-                    title={isScreenSharing ? 'Stop screen sharing' : 'Share screen'}
-                    className={`p-2 rounded-lg transition-colors ${
-                      isScreenSharing 
-                        ? 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20' 
-                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
                   </button>
                 </div>
               </div>
@@ -746,19 +684,10 @@ export default function Messages() {
         </div>
       )}
 
-      {/* Incoming Call Notification */}
-      {incomingCall && (
-        <IncomingCallNotification
-          from={incomingCall.from}
-          callType={incomingCall.callType}
-          onAccept={acceptCall}
-          onReject={rejectCall}
-        />
-      )}
 
       {/* Call Modals */}
       {activeCall && activeCall.type === 'audio' && (
-        <AudioCallModal
+        <SimpleAudioCallModal
           call={activeCall}
           user={currentUser}
           onEndCall={handleEndCall}
@@ -766,17 +695,8 @@ export default function Messages() {
         />
       )}
 
-      {activeCall && activeCall.type === 'video' && useRealWebRTC && (
-        <VideoCallModalReal
-          call={activeCall}
-          user={currentUser}
-          onEndCall={handleEndCall}
-          onClose={handleCloseCallModal}
-        />
-      )}
-
-      {activeCall && activeCall.type === 'video' && !useRealWebRTC && (
-        <VideoCallModal
+      {activeCall && activeCall.type === 'video' && (
+        <RobustVideoCallModal
           call={activeCall}
           user={currentUser}
           onEndCall={handleEndCall}

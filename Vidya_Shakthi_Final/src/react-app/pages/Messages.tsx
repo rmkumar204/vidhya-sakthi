@@ -3,7 +3,8 @@ import {
   PhoneIcon, 
   VideoCameraIcon, 
   MagnifyingGlassIcon,
-  ArrowLeftIcon
+  ArrowLeftIcon,
+  ComputerDesktopIcon
 } from '@heroicons/react/24/outline';
 import TypingIndicator from '@/react-app/components/TypingIndicator';
 import MessageInput from '@/react-app/components/MessageInput';
@@ -69,6 +70,7 @@ interface Message {
   id: string;
   senderId: string;
   senderName: string;
+  senderAvatar?: string; // Emoji avatar (like 👩‍💻, 👨‍💻)
   content: string; // can be text or URL for media
   timestamp: Date;
   type: 'text' | 'audio' | 'file' | 'image';
@@ -129,6 +131,7 @@ const initialMessages: Message[] = [
     id: '1',
     senderId: '1',
     senderName: 'Priya Sharma',
+    senderAvatar: '👩‍💻',
     content: 'Hi! I have a question about the **CSS assignment**',
     timestamp: new Date(Date.now() - 1000 * 60 * 15),
     type: 'text',
@@ -138,6 +141,7 @@ const initialMessages: Message[] = [
     id: '2',
     senderId: 'me',
     senderName: 'You',
+    senderAvatar: '👤',
     content: 'Sure! Here\'s a quick explanation:\n\n> **justify-content** controls horizontal alignment\n> **align-items** controls vertical alignment\n\nTry this code:\n`display: flex`\n\nHere are the main properties:\n• **justify-content**: horizontal alignment\n• **align-items**: vertical alignment\n• **flex-direction**: row or column\n• **flex-wrap**: wrap or nowrap\n\n1. First, set `display: flex`\n2. Then add `justify-content: center`\n3. Finally, add `align-items: center`',
     timestamp: new Date(Date.now() - 1000 * 60 * 14),
     type: 'text',
@@ -147,6 +151,7 @@ const initialMessages: Message[] = [
     id: '3',
     senderId: '1',
     senderName: 'Priya Sharma',
+    senderAvatar: '👩‍💻',
     content: 'I\'m struggling with *flexbox layouts*. Could you explain the difference between `justify-content` and `align-items`?',
     timestamp: new Date(Date.now() - 1000 * 60 * 13),
     type: 'text',
@@ -156,6 +161,7 @@ const initialMessages: Message[] = [
     id: '4',
     senderId: 'me',
     senderName: 'You',
+    senderAvatar: '👤',
     content: 'Great question! justify-content controls alignment along the main axis, while align-items controls alignment along the cross axis.',
     timestamp: new Date(Date.now() - 1000 * 60 * 10),
     type: 'text',
@@ -165,6 +171,7 @@ const initialMessages: Message[] = [
     id: '5',
     senderId: '1',
     senderName: 'Priya Sharma',
+    senderAvatar: '👩‍💻',
     content: 'Thank you for the feedback on my project!',
     timestamp: new Date(Date.now() - 1000 * 60 * 5),
     type: 'text',
@@ -226,6 +233,7 @@ export default function Messages() {
       addMessage({
         senderId: 'bot',
         senderName: 'Mentor Bot',
+        senderAvatar: '🤖',
         content: `Here is a suggestion for "${prompt}"\n\n- Try breaking the problem down\n- Focus on one layout at a time\n- Use devtools to inspect flex axes`,
         type: 'text',
         isMe: false
@@ -242,7 +250,7 @@ export default function Messages() {
     const sendNow = () => {
       // Send text
       if (hasText) {
-        addMessage({ senderId: 'me', senderName: 'You', content: messageText.trim(), type: 'text', isMe: true });
+        addMessage({ senderId: 'me', senderName: 'You', senderAvatar: '👤', content: messageText.trim(), type: 'text', isMe: true });
         simulateBotReply(messageText.trim());
       }
       // Send files
@@ -254,6 +262,7 @@ export default function Messages() {
           addMessage({
             senderId: 'me',
             senderName: 'You',
+            senderAvatar: '👤',
             content: url,
             type: isImage ? 'image' : (isAudio ? 'audio' : 'file'),
             isMe: true
@@ -318,7 +327,8 @@ export default function Messages() {
         type: 'text',
         isMe: true,
         senderId: 'current-user',
-        senderName: 'You'
+        senderName: 'You',
+        senderAvatar: '👤'
       });
     } else {
       // Start screen sharing directly
@@ -346,7 +356,8 @@ export default function Messages() {
           type: 'text',
           isMe: true,
           senderId: 'current-user',
-          senderName: 'You'
+          senderName: 'You',
+          senderAvatar: '👤'
         });
 
         // Handle when user stops sharing via browser UI
@@ -538,6 +549,17 @@ export default function Messages() {
                   >
                     <VideoCameraIcon className="h-5 w-5" />
                   </button>
+                  <button
+                    onClick={handleScreenShareClick}
+                    title={isScreenSharing ? 'Stop screen sharing' : 'Start screen sharing'}
+                    className={`p-2 rounded-lg transition-colors ${
+                      isScreenSharing 
+                        ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' 
+                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <ComputerDesktopIcon className="h-5 w-5" />
+                  </button>
                 </div>
               </div>
             </div>
@@ -553,6 +575,7 @@ export default function Messages() {
                         size="md" 
                         online={false}
                         showStatus={false}
+                        emoji={message.senderAvatar}
                       />
                     </div>
                   )}
@@ -613,6 +636,7 @@ export default function Messages() {
                         size="md" 
                         online={true}
                         showStatus={false}
+                        emoji={message.senderAvatar}
                       />
                     </div>
                   )}

@@ -2,8 +2,8 @@ import { UsersIcon, FolderIcon, CheckIcon, AcademicCapIcon } from '@heroicons/re
 import StatCard from '@/react-app/components/StatCard';
 
 const mentorStats = [
-  { title: 'Projects Uploaded', value: '2', change: '+1 this week', changeType: 'positive' as const, icon: FolderIcon, iconColor: 'bg-blue-500' },
-  { title: 'Mentees Trained', value: '1', change: 'Steady', changeType: 'neutral' as const, icon: UsersIcon, iconColor: 'bg-purple-500' },
+  { title: 'Projects Uploaded', value: '2', change: '+1 this week', changeType: 'positive' as const, icon: FolderIcon, iconColor: 'bg-blue-500',path:'/app/projects' },
+  { title: 'Mentees Trained', value: '1', change: 'Steady', changeType: 'neutral' as const, icon: UsersIcon, iconColor: 'bg-purple-500' ,path:'/app/mentees'},
   { title: 'Hours This Week', value: '12', change: '+3h vs last week', changeType: 'positive' as const, icon: CheckIcon, iconColor: 'bg-orange-500' },
   { title: 'Live Sessions', value: '1', change: 'Schedule more', changeType: 'neutral' as const, icon: AcademicCapIcon, iconColor: 'bg-rose-500' },
 ];
@@ -11,9 +11,19 @@ const mentorStats = [
 export default function MentorDashboard() {
   return (
     <div className="space-y-6">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      {/* <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
         <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Mentor Overview</h1>
         <p className="text-gray-500 dark:text-gray-300">Quick snapshot of your impact and upcoming actions.</p>
+      </div> */}
+
+            {/* Welcome Message */}
+      <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-6 text-white">
+        <h2 className="text-2xl font-bold mb-2">
+          Welcome to your Mentor dashboard!
+        </h2>
+        <p className="opacity-90">
+          Here's what's happening in your Vidya Shakti Yuva journey today.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">

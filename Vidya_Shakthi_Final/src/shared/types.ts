@@ -139,3 +139,11 @@ export interface StepInfo {
   description: string;
   icon: React.ComponentType<{ className?: string }>;
 }
+
+
+export enum MediaType {
+  VIDEO = 'Video',
+  AUDIO = 'Audio',
+  DOCUMENT = 'Document',
+  IMAGE = 'Image',
+}

@@ -118,9 +118,9 @@ export default function Mentees() {
       </div>
 
       {/* Mentees Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6 items-stretch">
         {filteredMentees.map((mentee) => (
-          <div key={mentee.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
+          <div key={mentee.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow hover:-translate-y-0.5 flex flex-col">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center space-x-3">
                 <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-lg">
@@ -147,7 +147,7 @@ export default function Mentees() {
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{mentee.progress}% complete</p>
             </div>
 
-            <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+            <div className="mt-auto flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
               <span>Joined: {new Date(mentee.joinDate).toLocaleDateString()}</span>
               <button className="text-blue-600 dark:text-blue-400 hover:underline">
                 View Details

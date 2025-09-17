@@ -7,7 +7,7 @@ import connectDB from './config/db';
 import { notFound, errorHandler } from './middleware/error.middleware';
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
-// import projectRoutes from './routes/project.routes'; // Example for future
+import projectRoutes from './routes/project.routes';
 // import chatRoutes from './routes/chat.routes'; // Example for future
 
 // Load env vars
@@ -31,7 +31,7 @@ if (process.env.NODE_ENV === 'development') {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
-// app.use('/api/projects', projectRoutes);
+app.use('/api/projects', projectRoutes);
 // app.use('/api/chat', chatRoutes);
 
 app.get('/', (req, res) => {

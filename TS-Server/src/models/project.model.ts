@@ -13,13 +13,15 @@ interface IProject extends Document {
   is_approved: boolean;
   approved_by?: Types.ObjectId;
   approved_at?: Date;
+  content_types?: ('video' | 'audio' | 'document' | 'task' | 'quiz')[];
+  thumbnail_url?: string;
 }
 
 const projectSchema: Schema = new Schema(
   {
     title: { type: String, required: true },
     description: { type: String },
-    mentor: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    mentor: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     status: {
       type: String,
       enum: ['open', 'in_progress', 'completed', 'on_hold', 'cancelled'],
@@ -33,6 +35,8 @@ const projectSchema: Schema = new Schema(
     is_approved: { type: Boolean, default: false },
     approved_by: { type: Schema.Types.ObjectId, ref: 'User' },
     approved_at: { type: Date },
+    content_types: [{ type: String, enum: ['video', 'audio', 'document', 'task', 'quiz'] }],
+    thumbnail_url: { type: String },
   },
   {
     timestamps: true,

@@ -18,7 +18,6 @@ import Projects from "@/react-app/pages/Projects";
 import Tasks from "@/react-app/pages/Tasks";
 import Announcements from "@/react-app/pages/Announcements";
 import Messages from "@/react-app/pages/Messages";
-import MessagesNew from "@/react-app/pages/MessagesNew";
 import Notifications from "@/react-app/pages/Notifications";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -45,10 +44,9 @@ export default function App() {
                 <Route path="projects" element={<Projects />} />
                 <Route path="tasks" element={<Tasks />} />
                 <Route path="announcements" element={<Announcements />} />
-                <Route path="messages" element={<MessagesNew />} />
+                <Route path="messages" element={<Messages />} />
                 <Route path="notifications" element={<Notifications />} />
                 <Route path="reviews" element={<Projects />} />
-                <Route path="comments" element={<Messages />} />
                 <Route path="certificates" element={<Dashboard />} />
                 <Route path="users" element={<Mentees />} />
                 <Route path="approvals" element={<Projects />} />

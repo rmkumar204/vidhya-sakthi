@@ -24,6 +24,7 @@ export interface CallState {
   isAudioEnabled: boolean;
   isVideoEnabled: boolean;
   isScreenSharing: boolean;
+  isSpeakerOn: boolean;
   callDuration: number;
   error: string | null;
 }

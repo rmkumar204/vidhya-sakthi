@@ -4,19 +4,17 @@ import {
   PhoneIcon, 
   VideoCameraIcon, 
   MagnifyingGlassIcon,
-  ArrowLeftIcon
+  ArrowLeftIcon,
+  ComputerDesktopIcon
 } from '@heroicons/react/24/outline';
 import TypingIndicator from '@/react-app/components/TypingIndicator';
 import MessageInput from '@/react-app/components/MessageInput';
 import Avatar from '@/react-app/components/Avatar';
-import { AudioCallModal } from '@/react-app/components/AudioCallModal';
-import { VideoCallModal } from '@/react-app/components/VideoCallModal';
-import { VideoCallModalReal } from '@/react-app/components/VideoCallModalReal';
-import { IncomingCallNotification } from '@/react-app/components/IncomingCallNotification';
+import { RobustVideoCallModal } from '@/react-app/components/RobustVideoCallModal';
+import { SimpleAudioCallModal } from '@/react-app/components/SimpleAudioCallModal';
 import { MediaTest } from '@/react-app/components/MediaTest';
-import { useWebRTCReal } from '@/react-app/hooks/useWebRTCReal';
-import { Call, User } from '@/react-app/types';
-import { performGlobalMediaCleanup } from '@/react-app/utils/mediaCleanup';
+import { Call } from '@/react-app/types';
+import { getUserProfile, getCurrentUserProfile, UserProfile } from '@/react-app/services/userProfileService';
 
 // Enhanced utility function to render formatted text like Teams
 const renderFormattedText = (text: string) => {
@@ -74,10 +72,13 @@ interface Message {
   id: string;
   senderId: string;
   senderName: string;
+  senderAvatar?: string; // Emoji avatar (like 👩‍💻, 👨‍💻)
   content: string; // can be text or URL for media
   timestamp: Date;
   type: 'text' | 'audio' | 'file' | 'image';
   isMe: boolean;
+  isScheduled?: boolean;
+  scheduledFor?: Date;
 }
 
 interface Chat {
@@ -88,6 +89,7 @@ interface Chat {
   timestamp: Date;
   unread: number;
   online: boolean;
+  userId: string; // Reference to user profile
 }
 
 const chats: Chat[] = [
@@ -95,6 +97,7 @@ const chats: Chat[] = [
     id: '1',
     name: 'Priya Sharma',
     avatar: '👩‍💻',
+    userId: '1',
     lastMessage: 'Thank you for the feedback on my project!',
     timestamp: new Date(Date.now() - 1000 * 60 * 5),
     unread: 2,
@@ -104,6 +107,7 @@ const chats: Chat[] = [
     id: '2',
     name: 'Rahul Kumar',
     avatar: '👨‍💻',
+    userId: '2',
     lastMessage: 'Can we schedule a call tomorrow?',
     timestamp: new Date(Date.now() - 1000 * 60 * 30),
     unread: 1,
@@ -113,6 +117,7 @@ const chats: Chat[] = [
     id: '3',
     name: 'Anita Patel',
     avatar: '👩‍🎓',
+    userId: '3',
     lastMessage: 'I completed the assignment',
     timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
     unread: 0,
@@ -122,6 +127,7 @@ const chats: Chat[] = [
     id: '4',
     name: 'Vikash Singh',
     avatar: '👨‍🎓',
+    userId: '4',
     lastMessage: 'Great! Looking forward to the next session',
     timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4),
     unread: 0,
@@ -134,6 +140,7 @@ const initialMessages: Message[] = [
     id: '1',
     senderId: '1',
     senderName: 'Priya Sharma',
+    senderAvatar: '👩‍💻',
     content: 'Hi! I have a question about the **CSS assignment**',
     timestamp: new Date(Date.now() - 1000 * 60 * 15),
     type: 'text',
@@ -143,23 +150,8 @@ const initialMessages: Message[] = [
     id: '2',
     senderId: 'me',
     senderName: 'You',
-    content: `Sure! Here's a quick explanation:
-
-> **justify-content** controls horizontal alignment
-> **align-items** controls vertical alignment
-
-Try this code:
-\`display: flex\`
-
-Here are the main properties:
-• **justify-content**: horizontal alignment
-• **align-items**: vertical alignment
-• **flex-direction**: row or column
-• **flex-wrap**: wrap or nowrap
-
-1. First, set \`display: flex\`
-2. Then add \`justify-content: center\`
-3. Finally, add \`align-items: center\``,
+    senderAvatar: '👤',
+    content: 'Sure! Here\'s a quick explanation:\n\n> **justify-content** controls horizontal alignment\n> **align-items** controls vertical alignment\n\nTry this code:\n`display: flex`\n\nHere are the main properties:\n• **justify-content**: horizontal alignment\n• **align-items**: vertical alignment\n• **flex-direction**: row or column\n• **flex-wrap**: wrap or nowrap\n\n1. First, set `display: flex`\n2. Then add `justify-content: center`\n3. Finally, add `align-items: center`',
     timestamp: new Date(Date.now() - 1000 * 60 * 14),
     type: 'text',
     isMe: true
@@ -168,6 +160,7 @@ Here are the main properties:
     id: '3',
     senderId: '1',
     senderName: 'Priya Sharma',
+    senderAvatar: '👩‍💻',
     content: 'I\'m struggling with *flexbox layouts*. Could you explain the difference between `justify-content` and `align-items`?',
     timestamp: new Date(Date.now() - 1000 * 60 * 13),
     type: 'text',
@@ -177,6 +170,7 @@ Here are the main properties:
     id: '4',
     senderId: 'me',
     senderName: 'You',
+    senderAvatar: '👤',
     content: 'Great question! justify-content controls alignment along the main axis, while align-items controls alignment along the cross axis.',
     timestamp: new Date(Date.now() - 1000 * 60 * 10),
     type: 'text',
@@ -186,6 +180,7 @@ Here are the main properties:
     id: '5',
     senderId: '1',
     senderName: 'Priya Sharma',
+    senderAvatar: '👩‍💻',
     content: 'Thank you for the feedback on my project!',
     timestamp: new Date(Date.now() - 1000 * 60 * 5),
     type: 'text',
@@ -208,29 +203,20 @@ export default function Messages() {
   // Call state
   const [activeCall, setActiveCall] = useState<Call | null>(null);
   const [showMediaTest, setShowMediaTest] = useState(false);
-  const [useRealWebRTC, setUseRealWebRTC] = useState(false);
-  const [currentUser] = useState<User>({
-    id: 'current-user',
-    name: 'You',
-    email: 'user@example.com',
-    role: 'mentor',
-    avatar: '👤'
-  });
+  const [currentUser] = useState<UserProfile | null>(getCurrentUserProfile());
 
-  // Real WebRTC hook
-  const { 
-    incomingCall, 
-    callStatus,
-    acceptCall,
-    rejectCall,
-    endCall: endRealCall 
-  } = useWebRTCReal();
 
   const filteredChats = chats.filter(chat =>
     chat.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const selectedChatData = chats.find(chat => chat.id === selectedChat);
+
+  // Helper function to get user avatar from profile
+  const getUserAvatar = (userId: string): string => {
+    const userProfile = getUserProfile(userId);
+    return userProfile?.avatar || '👤';
+  };
 
   // Cleanup screen sharing on unmount
   useEffect(() => {
@@ -256,11 +242,8 @@ export default function Messages() {
       addMessage({
         senderId: 'bot',
         senderName: 'Mentor Bot',
-        content: `Here is a suggestion for "${prompt}"
-
-- Try breaking the problem down
-- Focus on one layout at a time
-- Use devtools to inspect flex axes`,
+        senderAvatar: '🤖',
+        content: `Here is a suggestion for "${prompt}"\n\n- Try breaking the problem down\n- Focus on one layout at a time\n- Use devtools to inspect flex axes`,
         type: 'text',
         isMe: false
       });
@@ -276,7 +259,7 @@ export default function Messages() {
     const sendNow = () => {
       // Send text
       if (hasText) {
-        addMessage({ senderId: 'me', senderName: 'You', content: messageText.trim(), type: 'text', isMe: true });
+        addMessage({ senderId: 'me', senderName: 'You', senderAvatar: currentUser?.avatar || '👤', content: messageText.trim(), type: 'text', isMe: true });
         simulateBotReply(messageText.trim());
       }
       // Send files
@@ -288,6 +271,7 @@ export default function Messages() {
           addMessage({
             senderId: 'me',
             senderName: 'You',
+            senderAvatar: currentUser?.avatar || '👤',
             content: url,
             type: isImage ? 'image' : (isAudio ? 'audio' : 'file'),
             isMe: true
@@ -300,8 +284,11 @@ export default function Messages() {
   };
 
   const handleScheduleMessage = (messageText: string, files: File[] | undefined, scheduledFor: Date) => {
+    const scheduledMessageId = Date.now().toString();
+    const displayMessageId = `scheduled_${scheduledMessageId}`;
+    
     const scheduledMessage = {
-      id: Date.now().toString(),
+      id: scheduledMessageId,
       message: messageText,
       files: files,
       scheduledFor: scheduledFor
@@ -309,19 +296,43 @@ export default function Messages() {
     
     setScheduledMessages(prev => [...prev, scheduledMessage]);
     
+    // Add scheduled message to the messages list for display
+    addMessage({
+      id: displayMessageId,
+      senderId: 'me',
+      senderName: 'You',
+      senderAvatar: currentUser?.avatar || '👤',
+      content: messageText,
+      type: 'text',
+      isMe: true,
+      isScheduled: true,
+      scheduledFor: scheduledFor
+    });
+    
     // Schedule the actual sending
     const delay = scheduledFor.getTime() - Date.now();
     if (delay > 0) {
       setTimeout(() => {
+        // Remove the scheduled message and send the actual message
+        setMessagesState(prev => prev.filter(msg => msg.id !== displayMessageId));
         handleSendMessage(messageText, files);
         // Remove from scheduled messages
-        setScheduledMessages(prev => prev.filter(msg => msg.id !== scheduledMessage.id));
+        setScheduledMessages(prev => prev.filter(msg => msg.id !== scheduledMessageId));
       }, delay);
     }
   };
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const formatScheduledTime = (date: Date) => {
+    return date.toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true 
+    });
   };
 
   const formatLastMessageTime = (date: Date) => {
@@ -352,7 +363,8 @@ export default function Messages() {
         type: 'text',
         isMe: true,
         senderId: 'current-user',
-        senderName: 'You'
+        senderName: 'You',
+        senderAvatar: currentUser?.avatar || '👤'
       });
     } else {
       // Start screen sharing directly
@@ -380,7 +392,8 @@ export default function Messages() {
           type: 'text',
           isMe: true,
           senderId: 'current-user',
-          senderName: 'You'
+          senderName: 'You',
+          senderAvatar: currentUser?.avatar || '👤'
         });
 
         // Handle when user stops sharing via browser UI
@@ -447,11 +460,6 @@ export default function Messages() {
     setActiveCall(null);
   };
 
-  const handleForceCleanup = async () => {
-    toast.success('Media cleanup completed');
-    await performGlobalMediaCleanup();
-    setActiveCall(null);
-  };
 
   return (
     <div className="h-[calc(100vh-8rem)] flex bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden relative">
@@ -487,14 +495,13 @@ export default function Messages() {
               }`}
             >
               <div className="flex items-center space-x-3">
-                <div className="relative">
-                  <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-lg">
-                    {chat.avatar}
-                  </div>
-                  {chat.online && (
-                    <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></div>
-                  )}
-                </div>
+                <Avatar 
+                  name={chat.name}
+                  size="xl"
+                  online={chat.online}
+                  showStatus={true}
+                  emoji={getUserAvatar(chat.userId)}
+                />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <h3 className="font-medium text-gray-900 dark:text-white truncate">{chat.name}</h3>
@@ -540,14 +547,13 @@ export default function Messages() {
                   >
                     <ArrowLeftIcon className="h-5 w-5" />
                   </button>
-                  <div className="relative">
-                    <div className="h-10 w-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white">
-                      {selectedChatData.avatar}
-                    </div>
-                    {selectedChatData.online && (
-                      <div className="absolute -bottom-1 -right-1 h-3 w-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></div>
-                    )}
-                  </div>
+                  <Avatar 
+                    name={selectedChatData.name}
+                    size="lg"
+                    online={selectedChatData.online}
+                    showStatus={true}
+                    emoji={getUserAvatar(selectedChatData.userId)}
+                  />
                   <div>
                     <h3 className="font-medium text-gray-900 dark:text-white">{selectedChatData.name}</h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -564,7 +570,7 @@ export default function Messages() {
                   <button
                     onClick={handleStartAudioCall}
                     disabled={!selectedChatData.online}
-                    title={selectedChatData.online ? 'Start call' : 'User offline'}
+                    title={selectedChatData.online ? 'Start audio call' : 'User offline'}
                     className={`p-2 rounded-lg transition-colors ${selectedChatData.online ? 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' : 'text-gray-400 cursor-not-allowed'}`}
                   >
                     <PhoneIcon className="h-5 w-5" />
@@ -572,54 +578,21 @@ export default function Messages() {
                   <button
                     onClick={handleStartVideoCall}
                     disabled={!selectedChatData.online}
-                    title={selectedChatData.online ? 'Start video' : 'User offline'}
+                    title={selectedChatData.online ? 'Start video call' : 'User offline'}
                     className={`p-2 rounded-lg transition-colors ${selectedChatData.online ? 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' : 'text-gray-400 cursor-not-allowed'}`}
                   >
                     <VideoCameraIcon className="h-5 w-5" />
                   </button>
                   <button
-                    onClick={() => setShowMediaTest(!showMediaTest)}
-                    title="Test media access"
-                    className="p-2 rounded-lg transition-colors text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  >
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={handleForceCleanup}
-                    title="Force stop camera/microphone"
-                    className="p-2 rounded-lg transition-colors text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                  >
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => setUseRealWebRTC(!useRealWebRTC)}
-                    title={`${useRealWebRTC ? 'Disable' : 'Enable'} real WebRTC calls`}
-                    className={`p-2 rounded-lg transition-colors ${
-                      useRealWebRTC 
-                        ? 'bg-green-500 text-white hover:bg-green-600' 
-                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </button>
-                  <button
                     onClick={handleScreenShareClick}
-                    title={isScreenSharing ? 'Stop screen sharing' : 'Share screen'}
+                    title={isScreenSharing ? 'Stop screen sharing' : 'Start screen sharing'}
                     className={`p-2 rounded-lg transition-colors ${
                       isScreenSharing 
-                        ? 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20' 
+                        ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' 
                         : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
                   >
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
+                    <ComputerDesktopIcon className="h-5 w-5" />
                   </button>
                 </div>
               </div>
@@ -636,6 +609,7 @@ export default function Messages() {
                         size="md" 
                         online={false}
                         showStatus={false}
+                        emoji={getUserAvatar(message.senderId)}
                       />
                     </div>
                   )}
@@ -650,15 +624,29 @@ export default function Messages() {
                     )}
                     
                     <div className={`px-3 sm:px-4 py-2 sm:py-3 ${
-                      message.isMe 
-                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl rounded-br-md shadow-lg' 
-                        : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700 rounded-2xl rounded-bl-md shadow-sm'
+                      message.isScheduled
+                        ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl rounded-br-md shadow-lg'
+                        : message.isMe 
+                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl rounded-br-md shadow-lg' 
+                          : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700 rounded-2xl rounded-bl-md shadow-sm'
                     }`}>
                       {message.type === 'text' && (
-                        <p 
-                          className="text-sm leading-relaxed whitespace-pre-wrap" 
-                          dangerouslySetInnerHTML={{ __html: renderFormattedText(message.content) }}
-                        />
+                        <div>
+                          <p 
+                            className={`text-sm leading-relaxed whitespace-pre-wrap ${
+                              message.isScheduled ? 'text-gray-200 italic' : ''
+                            }`}
+                            dangerouslySetInnerHTML={{ __html: renderFormattedText(message.content) }}
+                          />
+                          {message.isScheduled && message.scheduledFor && (
+                            <div className="flex items-center mt-2 text-xs text-gray-300">
+                              <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                              </svg>
+                              <span>Scheduled for {formatScheduledTime(message.scheduledFor)}</span>
+                            </div>
+                          )}
+                        </div>
                       )}
                       {message.type === 'image' && (
                         <img src={message.content} alt="uploaded" className="rounded-lg max-h-60 object-contain" />
@@ -696,6 +684,7 @@ export default function Messages() {
                         size="md" 
                         online={true}
                         showStatus={false}
+                        emoji={currentUser?.avatar || '👤'}
                       />
                     </div>
                   )}
@@ -704,23 +693,18 @@ export default function Messages() {
               
               {/* Bot Typing Indicator */}
               {isBotTyping && selectedChatData && (
-                <TypingIndicator name={selectedChatData.name} />
+                <TypingIndicator 
+                  name={selectedChatData.name} 
+                  userId={selectedChatData.userId}
+                />
               )}
 
               {/* User Typing Indicator */}
               {isUserTyping && (
-                <div className="flex justify-end mb-4">
-                  <div className="max-w-xs lg:max-w-md bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl px-4 py-2">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-blue-700 dark:text-blue-200">You are typing</span>
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <TypingIndicator 
+                  name="You" 
+                  isCurrentUser={true}
+                />
               )}
 
             </div>
@@ -767,19 +751,10 @@ export default function Messages() {
         </div>
       )}
 
-      {/* Incoming Call Notification */}
-      {incomingCall && (
-        <IncomingCallNotification
-          from={incomingCall.from}
-          callType={incomingCall.callType}
-          onAccept={acceptCall}
-          onReject={rejectCall}
-        />
-      )}
 
       {/* Call Modals */}
-      {activeCall && activeCall.type === 'audio' && (
-        <AudioCallModal
+      {activeCall && activeCall.type === 'audio' && currentUser && (
+        <SimpleAudioCallModal
           call={activeCall}
           user={currentUser}
           onEndCall={handleEndCall}
@@ -787,17 +762,8 @@ export default function Messages() {
         />
       )}
 
-      {activeCall && activeCall.type === 'video' && useRealWebRTC && (
-        <VideoCallModalReal
-          call={activeCall}
-          user={currentUser}
-          onEndCall={handleEndCall}
-          onClose={handleCloseCallModal}
-        />
-      )}
-
-      {activeCall && activeCall.type === 'video' && !useRealWebRTC && (
-        <VideoCallModal
+      {activeCall && activeCall.type === 'video' && currentUser && (
+        <RobustVideoCallModal
           call={activeCall}
           user={currentUser}
           onEndCall={handleEndCall}

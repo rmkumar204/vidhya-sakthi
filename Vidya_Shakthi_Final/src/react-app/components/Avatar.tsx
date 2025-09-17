@@ -6,6 +6,7 @@ interface AvatarProps {
   online?: boolean;
   showStatus?: boolean;
   className?: string;
+  emoji?: string; // Emoji avatar (like 👩‍💻, 👨‍💻)
 }
 
 const Avatar: React.FC<AvatarProps> = ({ 
@@ -13,7 +14,8 @@ const Avatar: React.FC<AvatarProps> = ({
   size = 'md', 
   online = false, 
   showStatus = true,
-  className = '' 
+  className = '',
+  emoji
 }) => {
   // Generate initials from name
   const getInitials = (name: string): string => {
@@ -64,9 +66,17 @@ const Avatar: React.FC<AvatarProps> = ({
 
   return (
     <div className={`relative ${className}`}>
-      <div className={`${sizeClasses[size]} bg-gradient-to-br ${getBackgroundColor(name)} rounded-full flex items-center justify-center text-white font-medium shadow-sm`}>
-        {getInitials(name)}
-      </div>
+      {emoji ? (
+        // Emoji avatar
+        <div className={`${sizeClasses[size]} bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white shadow-sm`}>
+          <span className="text-lg">{emoji}</span>
+        </div>
+      ) : (
+        // Initials fallback
+        <div className={`${sizeClasses[size]} bg-gradient-to-br ${getBackgroundColor(name)} rounded-full flex items-center justify-center text-white font-medium shadow-sm`}>
+          {getInitials(name)}
+        </div>
+      )}
       {showStatus && online && (
         <div className={`absolute ${statusSizeClasses[size]} bg-green-500 rounded-full border-2 border-white dark:border-gray-800`}></div>
       )}

@@ -12,9 +12,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
 
   /** ✅ Save user in state + localStorage */
-  const login = (userData: User) => {
-    setUser(userData);
-    localStorage.setItem("user", JSON.stringify(userData));
+   const login = (userData: User) => {
+      setUser(userData);
+      localStorage.setItem("user", JSON.stringify(userData)); 
   };
 
   /** ✅ Clear user + token and send back to role selection/login */
@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // ---- STEP 1: Hit your backend to exchange code ----
       const response = await fetch(
-        "http://localhost:5000/api/auth/google/login",
+        "http://localhost:3000/api/auth/google/login",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

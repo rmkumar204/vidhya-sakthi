@@ -9,6 +9,9 @@ import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
 import locationRoutes from './routes/location.routes';
 import projectRoutes from './routes/project.routes';
+import connectionRequestRoutes from './routes/connectionRequest.routes';
+import notificationRoutes from './routes/notification.routes';
+import conversationRoutes from './routes/conversation.routes';
 // import chatRoutes from './routes/chat.routes'; // Example for future
 
 // Load env vars
@@ -35,6 +38,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/connection-requests', connectionRequestRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/conversations', conversationRoutes);
 // app.use('/api/chat', chatRoutes);
 
 app.get('/', (req, res) => {

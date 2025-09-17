@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { 
   PhoneIcon, 
   VideoCameraIcon, 
@@ -142,7 +143,23 @@ const initialMessages: Message[] = [
     id: '2',
     senderId: 'me',
     senderName: 'You',
-    content: 'Sure! Here\'s a quick explanation:\n\n> **justify-content** controls horizontal alignment\n> **align-items** controls vertical alignment\n\nTry this code:\n`display: flex`\n\nHere are the main properties:\n• **justify-content**: horizontal alignment\n• **align-items**: vertical alignment\n• **flex-direction**: row or column\n• **flex-wrap**: wrap or nowrap\n\n1. First, set `display: flex`\n2. Then add `justify-content: center`\n3. Finally, add `align-items: center`',
+    content: `Sure! Here's a quick explanation:
+
+> **justify-content** controls horizontal alignment
+> **align-items** controls vertical alignment
+
+Try this code:
+\`display: flex\`
+
+Here are the main properties:
+• **justify-content**: horizontal alignment
+• **align-items**: vertical alignment
+• **flex-direction**: row or column
+• **flex-wrap**: wrap or nowrap
+
+1. First, set \`display: flex\`
+2. Then add \`justify-content: center\`
+3. Finally, add \`align-items: center\``,
     timestamp: new Date(Date.now() - 1000 * 60 * 14),
     type: 'text',
     isMe: true
@@ -239,7 +256,11 @@ export default function Messages() {
       addMessage({
         senderId: 'bot',
         senderName: 'Mentor Bot',
-        content: `Here is a suggestion for "${prompt}"\n\n- Try breaking the problem down\n- Focus on one layout at a time\n- Use devtools to inspect flex axes`,
+        content: `Here is a suggestion for "${prompt}"
+
+- Try breaking the problem down
+- Focus on one layout at a time
+- Use devtools to inspect flex axes`,
         type: 'text',
         isMe: false
       });
@@ -417,17 +438,17 @@ export default function Messages() {
   };
 
   const handleEndCall = () => {
-    console.log('Messages: handleEndCall called');
+    // End call and cleanup
     setActiveCall(null);
   };
 
   const handleCloseCallModal = () => {
-    console.log('Messages: handleCloseCallModal called');
+    // Close modal and cleanup
     setActiveCall(null);
   };
 
   const handleForceCleanup = async () => {
-    console.log('Messages: Force cleanup called');
+    toast.success('Media cleanup completed');
     await performGlobalMediaCleanup();
     setActiveCall(null);
   };

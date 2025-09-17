@@ -3,10 +3,17 @@ import Project from '../models/project.model';
 
 // POST /api/projects
 export const createProject = asyncHandler(async (req, res) => {
-  const mentorId = req.user?._id || req.body.mentor; // middleware should set req.user
+  const mentorId = req.user?._id; // Get from authenticated user
+  
   if (!mentorId) {
-    // allow creation without mentor for demo; set a null mentor
-    // alternatively, you can return 400 with message
+    res.status(401);
+    throw new Error('Authentication required for project creation');
+  }
+  
+  // Verify user is a mentor
+  if (req.user.role !== 'mentor') {
+    res.status(403);
+    throw new Error('Only mentors can create projects');
   }
   const project = await Project.create({
     title: req.body.title,

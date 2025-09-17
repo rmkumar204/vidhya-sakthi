@@ -104,7 +104,12 @@ export async function createProject(body: CreateProjectRequest, token?: string) 
     },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error('Failed to create project');
+  
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ message: 'Failed to create project' }));
+    throw new Error(errorData.message || `HTTP ${res.status}: Failed to create project`);
+  }
+  
   return res.json();
 }
 

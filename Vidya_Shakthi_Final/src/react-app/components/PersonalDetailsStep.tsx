@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { PersonalDetailsType } from '@/shared/types';
 
 interface PersonalDetailsStepProps {
@@ -57,7 +58,10 @@ export default function PersonalDetailsStep({
   }, []);
 
   useEffect(()=>{
-    console.log('statees',states)
+    // Log states for debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.log('states', states);
+    }
   },[states])
   // Fetch districts when state changes
   useEffect(() => {

@@ -3,8 +3,11 @@ import ProjectFilters from '@/react-app/components/ProjectFilters';
 import ProjectCard from '@/react-app/components/ProjectCard';
 import Pagination from '@/react-app/components/Pagination';
 import { useProjects } from '@/react-app/hooks/useProjects';
+import { useAuth } from '@/react-app/hooks/useAuth';
+import { createConnectionRequest } from '@/react-app/services/ConnectionRequestService';
 import { BookOpenIcon, CheckIcon, UsersIcon, AcademicCapIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
+import toast from 'react-hot-toast';
 
 const menteeStats = [
   { title: 'Topics Subscribed', value: '0', change: 'Start exploring', changeType: 'neutral' as const, icon: BookOpenIcon, iconColor: 'bg-blue-500' },
@@ -14,6 +17,8 @@ const menteeStats = [
 ];
 
 export default function MenteeDashboard() {
+  const { user } = useAuth();
+  const token = user?.token;
   const { 
     projects, 
     pagination, 
@@ -32,13 +37,54 @@ export default function MenteeDashboard() {
   const [connectingProject, setConnectingProject] = useState<string | null>(null);
 
   const handleConnect = async (projectId: string) => {
+    if (!user || !token) {
+      toast.error('Please log in to connect with mentors');
+      return;
+    }
+
+    if (user.role !== 'mentee') {
+      toast.error('Only mentees can send connection requests');
+      return;
+    }
+
     setConnectingProject(projectId);
+    
     try {
-      // TODO: Implement project connection logic
-      console.log('Connecting to project:', projectId);
-      // This would typically call an API to connect the mentee to the project
-    } catch (error) {
+      console.log({projects, projectId});
+
+      console.log(projects[0]._id);
+      
+      
+      // Find the project to get mentor info
+      const project = projects.find(p => p._id === projectId);
+
+      console.log({project});
+      
+      if (!project || !project.mentor) {
+        toast.error('Project or mentor not found');
+        return;
+      }
+
+      await createConnectionRequest(
+        {
+          projectId: projectId,
+          mentorId: project.mentor._id,
+          message: `Hi! I'm interested in your project "${project.title}". I'd love to learn more and contribute.`
+        },
+        token
+      );
+      
+      toast.success('Request sent to mentor. You will be notified soon.', {
+        duration: 4000,
+        icon: '🚀',
+      });
+    } catch (error: any) {
       console.error('Failed to connect to project:', error);
+      if (error.message.includes('pending request')) {
+        toast.error('You already have a pending request for this project');
+      } else {
+        toast.error(error.message || 'Failed to send connection request');
+      }
     } finally {
       setConnectingProject(null);
     }
@@ -140,6 +186,7 @@ export default function MenteeDashboard() {
                   key={project._id}
                   project={project}
                   onConnect={handleConnect}
+                  isConnecting={connectingProject === project._id}
                 />
               ))}
             </div>

@@ -79,9 +79,14 @@ export function useProjects(initialParams: ProjectListParams = {}) {
   }, [params]);
 
   const addProject = async (payload: CreateProjectRequest, token?: string) => {
-    const created = await createProject(payload, token);
-    setProjects(prev => [created, ...prev]);
-    return created;
+    try {
+      const created = await createProject(payload, token);
+      setProjects(prev => [created, ...prev]);
+      return created;
+    } catch (error) {
+      // Re-throw the error so the UI can handle it
+      throw error;
+    }
   };
 
   const clearFilters = useCallback(() => {

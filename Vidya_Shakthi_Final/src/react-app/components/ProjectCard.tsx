@@ -4,9 +4,10 @@ import { Project } from '@/react-app/services/ProjectService';
 interface ProjectCardProps {
   project: Project;
   onConnect?: (projectId: string) => void;
+  isConnecting?: boolean;
 }
 
-export default function ProjectCard({ project, onConnect }: ProjectCardProps) {
+export default function ProjectCard({ project, onConnect, isConnecting = false }: ProjectCardProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'open':
@@ -50,37 +51,40 @@ export default function ProjectCard({ project, onConnect }: ProjectCardProps) {
   };
 
   return (
-    <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md transition-shadow duration-200">
+    <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
       {/* Image section */}
-      <div className="relative">
+      <div className="relative overflow-hidden group">
         <img
           // src={project.thumbnail_url || `https://picsum.photos/id/${Math.floor(Math.random() * 10)}/400/225`}
           src={ `https://picsum.photos/id/${Math.floor(Math.random() * 10)}/400/225`}
           alt={project.title}
-          className="h-36 w-full object-cover"
+          className="h-36 w-full object-cover transition-all duration-300 group-hover:scale-110 group-hover:brightness-110"
         />
         
+        {/* Hover overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        
         {/* Status badge */}
-        <div className="absolute top-3 left-3">
-          <span className={`inline-flex text-xs px-2 py-1 rounded-full font-medium ${getStatusColor(project.status)}`}>
+        <div className="absolute top-3 left-3 z-10">
+          <span className={`inline-flex text-xs px-2 py-1 rounded-full font-medium transition-all duration-300 group-hover:scale-105 ${getStatusColor(project.status)}`}>
             {project.status.replace('_', ' ').toUpperCase()}
           </span>
         </div>
 
         {/* Content types */}
         {project.content_types && project.content_types.length > 0 && (
-          <div className="absolute top-3 right-3 flex gap-1">
+          <div className="absolute top-3 right-3 flex gap-1 z-10">
             {project.content_types.slice(0, 3).map((type, index) => (
               <span
                 key={index}
-                className="text-lg bg-white/80 backdrop-blur rounded-full w-8 h-8 flex items-center justify-center"
+                className="text-lg bg-white/80 backdrop-blur rounded-full w-8 h-8 flex items-center justify-center transition-all duration-300 group-hover:scale-105 group-hover:bg-white/90"
                 title={type.charAt(0).toUpperCase() + type.slice(1)}
               >
                 {getContentTypeIcon(type)}
               </span>
             ))}
             {project.content_types.length > 3 && (
-              <span className="text-xs bg-white/80 backdrop-blur rounded-full w-8 h-8 flex items-center justify-center font-medium">
+              <span className="text-xs bg-white/80 backdrop-blur rounded-full w-8 h-8 flex items-center justify-center font-medium transition-all duration-300 group-hover:scale-105 group-hover:bg-white/90">
                 +{project.content_types.length - 3}
               </span>
             )}
@@ -162,10 +166,19 @@ export default function ProjectCard({ project, onConnect }: ProjectCardProps) {
         {/* Action button */}
         <button
           onClick={() => onConnect?.(project._id)}
-          disabled={project.status !== 'open'}
-          className="w-full rounded-md bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-2 text-sm font-medium transition-colors duration-200"
+          disabled={project.status !== 'open' || isConnecting}
+          className="w-full rounded-md bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-2 text-sm font-medium transition-colors duration-200 flex items-center justify-center gap-2"
         >
-          {project.status === 'open' ? 'Connect with Mentor' : 'Not Available'}
+          {isConnecting ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              Sending Request...
+            </>
+          ) : project.status === 'open' ? (
+            'Connect with Mentor'
+          ) : (
+            'Not Available'
+          )}
         </button>
       </div>
     </div>

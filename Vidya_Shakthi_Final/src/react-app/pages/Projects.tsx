@@ -2,9 +2,13 @@ import { useMemo, useState } from 'react';
 import { PlusIcon, FunnelIcon, CalendarIcon, UsersIcon } from '@heroicons/react/24/outline';
 import ProjectCreateModal from '@/react-app/components/ProjectCreateModal';
 import { useProjects } from '@/react-app/hooks/useProjects';
+import { useAuth } from '@/react-app/hooks/useAuth';
+import toast from 'react-hot-toast';
 
 export default function Projects() {
-  const { projects, loading, setFilters, addProject } = useProjects();
+  const { user } = useAuth();
+  const token = user?.token;
+  const { projects, loading, addProject } = useProjects();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
@@ -56,10 +60,12 @@ export default function Projects() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Projects</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">Create and manage your mentoring projects</p>
         </div>
-        <button onClick={() => setOpen(true)} className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-          <PlusIcon className="h-5 w-5 mr-2" />
-          Create Project
-        </button>
+        {user?.role === 'mentor' && (
+          <button onClick={() => setOpen(true)} className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            <PlusIcon className="h-5 w-5 mr-2" />
+            Create Project
+          </button>
+        )}
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">
@@ -142,7 +148,23 @@ export default function Projects() {
           open={open}
           onClose={() => setOpen(false)}
           onCreate={async (payload) => {
-            await addProject(payload, localStorage.getItem('access_token') || undefined);
+            try {
+              if (!user || !token) {
+                toast.error('Please log in to create projects');
+                return;
+              }
+              
+              if (user.role !== 'mentor') {
+                toast.error('Only mentors can create projects');
+                return;
+              }
+              
+              await addProject(payload, token);
+              toast.success('Project created successfully!');
+            } catch (error: any) {
+              console.error('Failed to create project:', error);
+              toast.error(error.message || 'Failed to create project');
+            }
           }}
         />
       )}

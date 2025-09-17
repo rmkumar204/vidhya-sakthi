@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { RoleCard as RoleCardType, UserRoleType } from '@/shared/types';
 import RoleCard from '@/react-app/components/RoleCard';
 import ThemeToggle from '@/react-app/components/ThemeToggle';
@@ -31,7 +32,7 @@ const roleCards: RoleCardType[] = [
 ];
 
 export default function RoleSelection() {
-  console.log('here comes')
+  // Handle role selection logic here
   const navigate = useNavigate();
 
   const handleRoleSelect = (role: UserRoleType) => {

@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import toast from 'react-hot-toast';
 import { getUserMedia, checkMediaPermissions, requestMediaPermissions, isWebRTCSupported } from '../utils/webrtc';
 import { MEDIA_CONSTRAINTS } from '../utils/constants';
 
@@ -60,9 +61,11 @@ export const MediaTest: React.FC = () => {
 
   const stopTest = () => {
     if (stream) {
-      console.log('Stopping test stream...');
+      // Stop all media tracks
       stream.getTracks().forEach(track => {
-        console.log(`Stopping ${track.kind} track:`, track.label);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`Stopping ${track.kind} track:`, track.label);
+        }
         track.stop();
       });
       setStream(null);
@@ -78,7 +81,7 @@ export const MediaTest: React.FC = () => {
   React.useEffect(() => {
     return () => {
       if (stream) {
-        console.log('MediaTest: Cleaning up stream on unmount...');
+        // Cleanup stream on component unmount
         stream.getTracks().forEach(track => track.stop());
         if (videoRef.current) {
           videoRef.current.srcObject = null;

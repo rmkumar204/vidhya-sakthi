@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/react-app/contexts/ThemeContext";
 import { AuthProvider } from "@/react-app/contexts/AuthContext";
+import { Toaster } from 'react-hot-toast';
 
 // Public pages
 import RoleSelection from "@/react-app/pages/RoleSelection";
@@ -17,6 +18,8 @@ import Projects from "@/react-app/pages/Projects";
 import Tasks from "@/react-app/pages/Tasks";
 import Announcements from "@/react-app/pages/Announcements";
 import Messages from "@/react-app/pages/Messages";
+import MessagesNew from "@/react-app/pages/MessagesNew";
+import Notifications from "@/react-app/pages/Notifications";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 export default function App() {
@@ -42,7 +45,8 @@ export default function App() {
                 <Route path="projects" element={<Projects />} />
                 <Route path="tasks" element={<Tasks />} />
                 <Route path="announcements" element={<Announcements />} />
-                <Route path="messages" element={<Messages />} />
+                <Route path="messages" element={<MessagesNew />} />
+                <Route path="notifications" element={<Notifications />} />
                 <Route path="reviews" element={<Projects />} />
                 <Route path="comments" element={<Messages />} />
                 <Route path="certificates" element={<Dashboard />} />
@@ -54,6 +58,31 @@ export default function App() {
               </Route>
             </Route>
           </Routes>
+          
+          {/* Toast notifications */}
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: 'var(--toast-bg)',
+                color: 'var(--toast-color)',
+                border: '1px solid var(--toast-border)',
+              },
+              success: {
+                iconTheme: {
+                  primary: '#10b981',
+                  secondary: '#ffffff',
+                },
+              },
+              error: {
+                iconTheme: {
+                  primary: '#ef4444',
+                  secondary: '#ffffff',
+                },
+              },
+            }}
+          />
         </AuthProvider>
       </Router>
     </ThemeProvider>

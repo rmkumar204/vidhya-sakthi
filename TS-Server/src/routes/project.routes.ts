@@ -6,7 +6,7 @@ const router = express.Router();
 
 router.route('/')
   .get(listProjects)
-  .post( createProject);
+  .post(protect, createProject);
 
 router.route('/filters/options')
   .get(getFilterOptions);

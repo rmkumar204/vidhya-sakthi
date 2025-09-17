@@ -17,6 +17,7 @@ export const SimpleAudioCallModal: React.FC<SimpleAudioCallModalProps> = ({
 }) => {
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [isMaximized, setIsMaximized] = useState(false);
 
   const { 
     callState, 
@@ -68,6 +69,10 @@ export const SimpleAudioCallModal: React.FC<SimpleAudioCallModalProps> = ({
   const handleToggleSpeaker = () => {
     console.log('Toggling speaker...');
     toggleSpeaker();
+  };
+
+  const handleToggleMaximize = () => {
+    setIsMaximized(!isMaximized);
   };
 
   const formatDuration = (seconds: number) => {
@@ -132,8 +137,29 @@ export const SimpleAudioCallModal: React.FC<SimpleAudioCallModalProps> = ({
 
   // Simple audio call interface
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50">
-      <div className="relative w-full max-w-md mx-auto bg-gradient-to-br from-blue-900 to-purple-900 rounded-lg overflow-hidden flex flex-col min-h-[500px]">
+    <div className={`fixed inset-0 bg-black bg-opacity-90 z-50 ${isMaximized ? '' : 'flex items-center justify-center'}`}>
+      <div className={`relative bg-gradient-to-br from-blue-900 to-purple-900 overflow-hidden flex flex-col ${
+        isMaximized 
+          ? 'w-full h-full' 
+          : 'w-full max-w-md mx-auto rounded-lg min-h-[500px]'
+      }`}>
+      {/* Maximize/Minimize button */}
+      <button
+        onClick={handleToggleMaximize}
+        className="absolute top-4 right-16 z-10 p-2 bg-gray-800 rounded-full hover:bg-gray-700 transition-colors"
+        title={isMaximized ? 'Minimize' : 'Maximize'}
+      >
+        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {isMaximized ? (
+            // Minimize icon (restore down)
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9V4.5M9 9H4.5M9 9L3.5 3.5M15 9v4.5M15 9h4.5M15 9l5.5-5.5M9 15v4.5M9 15H4.5M9 15l-5.5 5.5M15 15v-4.5M15 15h4.5M15 15l5.5 5.5" />
+          ) : (
+            // Maximize icon (fullscreen)
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+          )}
+        </svg>
+      </button>
+
       {/* Close button */}
       <button
         onClick={() => {
@@ -159,13 +185,15 @@ export const SimpleAudioCallModal: React.FC<SimpleAudioCallModalProps> = ({
       <div className="flex-1 flex items-center justify-center relative min-h-0 px-6">
         {/* Large Avatar Display */}
         <div className="text-center w-full">
-          <div className="w-48 h-48 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center shadow-2xl mx-auto mb-6">
-            <span className="text-5xl font-bold text-white">👤</span>
+          <div className={`bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center shadow-2xl mx-auto mb-6 ${
+            isMaximized ? 'w-80 h-80' : 'w-48 h-48'
+          }`}>
+            <span className={`font-bold text-white ${isMaximized ? 'text-8xl' : 'text-5xl'}`}>👤</span>
           </div>
-          <h2 className="text-xl font-semibold text-white mb-2">
+          <h2 className={`font-semibold text-white mb-2 ${isMaximized ? 'text-4xl' : 'text-xl'}`}>
             {call.participants[0] || 'Remote Participant'}
           </h2>
-          <p className="text-gray-300 text-sm">Audio Call</p>
+          <p className={`text-gray-300 ${isMaximized ? 'text-xl' : 'text-sm'}`}>Audio Call</p>
         </div>
 
         {/* Call Status Overlay */}

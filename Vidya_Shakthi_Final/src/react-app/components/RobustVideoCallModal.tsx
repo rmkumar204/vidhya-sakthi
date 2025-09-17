@@ -17,6 +17,7 @@ export const RobustVideoCallModal: React.FC<RobustVideoCallModalProps> = ({
 }) => {
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [isMaximized, setIsMaximized] = useState(false);
 
   const { 
     callState, 
@@ -132,6 +133,10 @@ export const RobustVideoCallModal: React.FC<RobustVideoCallModalProps> = ({
     toggleScreenShare();
   };
 
+  const handleToggleMaximize = () => {
+    setIsMaximized(!isMaximized);
+  };
+
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -194,8 +199,29 @@ export const RobustVideoCallModal: React.FC<RobustVideoCallModalProps> = ({
 
   // Robust video call interface
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50">
-      <div className="relative w-full h-full max-w-6xl max-h-[90vh] mx-auto bg-black rounded-lg overflow-hidden flex flex-col">
+    <div className={`fixed inset-0 bg-black bg-opacity-90 z-50 ${isMaximized ? '' : 'flex items-center justify-center'}`}>
+      <div className={`relative bg-black overflow-hidden flex flex-col ${
+        isMaximized 
+          ? 'w-full h-full' 
+          : 'w-full h-full max-w-6xl max-h-[90vh] mx-auto rounded-lg'
+      }`}>
+      {/* Maximize/Minimize button */}
+      <button
+        onClick={handleToggleMaximize}
+        className="absolute top-4 right-16 z-10 p-2 bg-gray-800 rounded-full hover:bg-gray-700 transition-colors"
+        title={isMaximized ? 'Minimize' : 'Maximize'}
+      >
+        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {isMaximized ? (
+            // Minimize icon (restore down)
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9V4.5M9 9H4.5M9 9L3.5 3.5M15 9v4.5M15 9h4.5M15 9l5.5-5.5M9 15v4.5M9 15H4.5M9 15l-5.5 5.5M15 15v-4.5M15 15h4.5M15 15l5.5 5.5" />
+          ) : (
+            // Maximize icon (fullscreen)
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+          )}
+        </svg>
+      </button>
+
       {/* Close button */}
       <button
         onClick={() => {
@@ -237,7 +263,11 @@ export const RobustVideoCallModal: React.FC<RobustVideoCallModalProps> = ({
 
         {/* Local Video (Picture-in-Picture) */}
         {callState.localStream && callState.isVideoEnabled && (
-          <div className="absolute bottom-20 right-4 w-48 h-36 bg-gray-900 rounded-lg overflow-hidden shadow-lg border-2 border-white z-20">
+          <div className={`absolute bg-gray-900 rounded-lg overflow-hidden shadow-lg border-2 border-white z-20 ${
+            isMaximized 
+              ? 'bottom-24 right-6 w-64 h-48' 
+              : 'bottom-20 right-4 w-48 h-36'
+          }`}>
             <video
               ref={localVideoRef}
               autoPlay
@@ -250,12 +280,16 @@ export const RobustVideoCallModal: React.FC<RobustVideoCallModalProps> = ({
 
         {/* Local Video Disabled Indicator */}
         {callState.localStream && !callState.isVideoEnabled && (
-          <div className="absolute bottom-20 right-4 w-48 h-36 bg-gray-800 rounded-lg shadow-lg border-2 border-red-500 flex items-center justify-center z-20">
+          <div className={`absolute bg-gray-800 rounded-lg shadow-lg border-2 border-red-500 flex items-center justify-center z-20 ${
+            isMaximized 
+              ? 'bottom-24 right-6 w-64 h-48' 
+              : 'bottom-20 right-4 w-48 h-36'
+          }`}>
             <div className="text-center text-white">
-              <svg className="w-8 h-8 mx-auto mb-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`mx-auto mb-2 text-red-500 ${isMaximized ? 'w-12 h-12' : 'w-8 h-8'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
               </svg>
-              <p className="text-sm text-red-500">Camera Off</p>
+              <p className={`text-red-500 ${isMaximized ? 'text-lg' : 'text-sm'}`}>Camera Off</p>
             </div>
           </div>
         )}

@@ -76,6 +76,8 @@ interface Message {
   timestamp: Date;
   type: 'text' | 'audio' | 'file' | 'image';
   isMe: boolean;
+  isScheduled?: boolean;
+  scheduledFor?: Date;
 }
 
 interface Chat {
@@ -281,8 +283,11 @@ export default function Messages() {
   };
 
   const handleScheduleMessage = (messageText: string, files: File[] | undefined, scheduledFor: Date) => {
+    const scheduledMessageId = Date.now().toString();
+    const displayMessageId = `scheduled_${scheduledMessageId}`;
+    
     const scheduledMessage = {
-      id: Date.now().toString(),
+      id: scheduledMessageId,
       message: messageText,
       files: files,
       scheduledFor: scheduledFor
@@ -290,19 +295,43 @@ export default function Messages() {
     
     setScheduledMessages(prev => [...prev, scheduledMessage]);
     
+    // Add scheduled message to the messages list for display
+    addMessage({
+      id: displayMessageId,
+      senderId: 'me',
+      senderName: 'You',
+      senderAvatar: currentUser?.avatar || '👤',
+      content: messageText,
+      type: 'text',
+      isMe: true,
+      isScheduled: true,
+      scheduledFor: scheduledFor
+    });
+    
     // Schedule the actual sending
     const delay = scheduledFor.getTime() - Date.now();
     if (delay > 0) {
       setTimeout(() => {
+        // Remove the scheduled message and send the actual message
+        setMessagesState(prev => prev.filter(msg => msg.id !== displayMessageId));
         handleSendMessage(messageText, files);
         // Remove from scheduled messages
-        setScheduledMessages(prev => prev.filter(msg => msg.id !== scheduledMessage.id));
+        setScheduledMessages(prev => prev.filter(msg => msg.id !== scheduledMessageId));
       }, delay);
     }
   };
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const formatScheduledTime = (date: Date) => {
+    return date.toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true 
+    });
   };
 
   const formatLastMessageTime = (date: Date) => {
@@ -594,15 +623,29 @@ export default function Messages() {
                     )}
                     
                     <div className={`px-3 sm:px-4 py-2 sm:py-3 ${
-                      message.isMe 
-                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl rounded-br-md shadow-lg' 
-                        : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700 rounded-2xl rounded-bl-md shadow-sm'
+                      message.isScheduled
+                        ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl rounded-br-md shadow-lg'
+                        : message.isMe 
+                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl rounded-br-md shadow-lg' 
+                          : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700 rounded-2xl rounded-bl-md shadow-sm'
                     }`}>
                       {message.type === 'text' && (
-                        <p 
-                          className="text-sm leading-relaxed whitespace-pre-wrap" 
-                          dangerouslySetInnerHTML={{ __html: renderFormattedText(message.content) }}
-                        />
+                        <div>
+                          <p 
+                            className={`text-sm leading-relaxed whitespace-pre-wrap ${
+                              message.isScheduled ? 'text-gray-200 italic' : ''
+                            }`}
+                            dangerouslySetInnerHTML={{ __html: renderFormattedText(message.content) }}
+                          />
+                          {message.isScheduled && message.scheduledFor && (
+                            <div className="flex items-center mt-2 text-xs text-gray-300">
+                              <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                              </svg>
+                              <span>Scheduled for {formatScheduledTime(message.scheduledFor)}</span>
+                            </div>
+                          )}
+                        </div>
                       )}
                       {message.type === 'image' && (
                         <img src={message.content} alt="uploaded" className="rounded-lg max-h-60 object-contain" />

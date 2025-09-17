@@ -547,7 +547,8 @@ export default function MessageInput({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (message.trim() || attachedFiles.length > 0) {
+    const textContent = editorRef.current?.textContent?.trim() || '';
+    if (textContent || attachedFiles.length > 0) {
       onSendMessage(message, attachedFiles.length > 0 ? attachedFiles : undefined);
       
       // Clear the contentEditable div
@@ -588,7 +589,41 @@ export default function MessageInput({
   };
 
   const handleEmojiSelect = (emoji: string) => {
-    setMessage(prev => prev + emoji);
+    if (!editorRef.current) return;
+    
+    const editor = editorRef.current;
+    editor.focus();
+    
+    // Get current selection
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      // If no selection, create a range at the end of the editor
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    }
+    
+    if (!selection) return;
+    const range = selection.getRangeAt(0);
+    
+    // Insert the emoji
+    const textNode = document.createTextNode(emoji);
+    range.deleteContents();
+    range.insertNode(textNode);
+    
+    // Move cursor after the emoji
+    range.setStartAfter(textNode);
+    range.setEndAfter(textNode);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    
+    // Update the message state with the HTML content
+    setMessage(editor.innerHTML);
+    
+    // Keep focus on the editor
+    editor.focus();
   };
 
   // Handle keyboard shortcuts for formatting
@@ -1097,7 +1132,7 @@ export default function MessageInput({
           {/* Send button - Paper airplane icon */}
           <button
             type="submit"
-            disabled={disabled || (!message.trim() && attachedFiles.length === 0)}
+            disabled={disabled || (!editorRef.current?.textContent?.trim() && attachedFiles.length === 0)}
             className="flex items-center justify-center p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             title="Send message"
           >

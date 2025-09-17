@@ -132,7 +132,22 @@ export const SimpleAudioCallModal: React.FC<SimpleAudioCallModalProps> = ({
 
   // Simple audio call interface
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-blue-900 to-purple-900 flex flex-col z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50">
+      <div className="relative w-full max-w-md mx-auto bg-gradient-to-br from-blue-900 to-purple-900 rounded-lg overflow-hidden flex flex-col min-h-[500px]">
+      {/* Close button */}
+      <button
+        onClick={() => {
+          console.log('SimpleAudioCallModal: Close button clicked...');
+          handleEndCall();
+          onClose();
+        }}
+        className="absolute top-4 right-4 z-10 p-2 bg-gray-800 rounded-full hover:bg-gray-700 transition-colors"
+      >
+        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+
       {/* Simple Top Bar - Just time */}
       <div className="absolute top-4 left-4 z-10">
         <span className="text-white text-lg font-medium">
@@ -141,16 +156,16 @@ export const SimpleAudioCallModal: React.FC<SimpleAudioCallModalProps> = ({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex items-center justify-center relative">
+      <div className="flex-1 flex items-center justify-center relative min-h-0 px-6">
         {/* Large Avatar Display */}
-        <div className="text-center">
-          <div className="w-64 h-64 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center shadow-2xl mx-auto mb-6">
-            <span className="text-6xl font-bold text-white">👤</span>
+        <div className="text-center w-full">
+          <div className="w-48 h-48 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center shadow-2xl mx-auto mb-6">
+            <span className="text-5xl font-bold text-white">👤</span>
           </div>
-          <h2 className="text-2xl font-semibold text-white mb-2">
+          <h2 className="text-xl font-semibold text-white mb-2">
             {call.participants[0] || 'Remote Participant'}
           </h2>
-          <p className="text-gray-300">Audio Call</p>
+          <p className="text-gray-300 text-sm">Audio Call</p>
         </div>
 
         {/* Call Status Overlay */}
@@ -184,7 +199,7 @@ export const SimpleAudioCallModal: React.FC<SimpleAudioCallModalProps> = ({
       </div>
 
       {/* Simple Bottom Controls - Only essential buttons */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-6">
+      <div className="relative bg-gradient-to-t from-black to-transparent p-6 mt-auto">
         <div className="flex items-center justify-center space-x-6">
           {/* Microphone Toggle */}
           <button
@@ -237,7 +252,7 @@ export const SimpleAudioCallModal: React.FC<SimpleAudioCallModalProps> = ({
 
       {/* Call Duration */}
       {callState.isInCall && callState.callDuration > 0 && (
-        <div className="absolute top-4 right-4 z-10">
+        <div className="absolute top-4 right-16 z-10">
           <span className="bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm">
             {formatDuration(callState.callDuration)}
           </span>
@@ -281,6 +296,7 @@ export const SimpleAudioCallModal: React.FC<SimpleAudioCallModalProps> = ({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

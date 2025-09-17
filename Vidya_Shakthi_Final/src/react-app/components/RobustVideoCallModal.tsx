@@ -194,7 +194,22 @@ export const RobustVideoCallModal: React.FC<RobustVideoCallModalProps> = ({
 
   // Robust video call interface
   return (
-    <div className="fixed inset-0 bg-black flex flex-col z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50">
+      <div className="relative w-full h-full max-w-6xl max-h-[90vh] mx-auto bg-black rounded-lg overflow-hidden flex flex-col">
+      {/* Close button */}
+      <button
+        onClick={() => {
+          console.log('RobustVideoCallModal: Close button clicked...');
+          handleEndCall();
+          onClose();
+        }}
+        className="absolute top-4 right-4 z-10 p-2 bg-gray-800 rounded-full hover:bg-gray-700 transition-colors"
+      >
+        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+
       {/* Simple Top Bar - Just time */}
       <div className="absolute top-4 left-4 z-10">
         <span className="text-white text-lg font-medium">
@@ -203,7 +218,7 @@ export const RobustVideoCallModal: React.FC<RobustVideoCallModalProps> = ({
       </div>
 
       {/* Main Video Area */}
-      <div className="flex-1 flex items-center justify-center relative">
+      <div className="flex-1 flex items-center justify-center relative min-h-0">
         {/* Remote Video or Avatar */}
         {callState.remoteStreams.size > 0 && callState.isVideoEnabled ? (
           <video
@@ -213,7 +228,7 @@ export const RobustVideoCallModal: React.FC<RobustVideoCallModalProps> = ({
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="flex items-center justify-center">
+          <div className="flex items-center justify-center w-full h-full">
             <div className="w-64 h-64 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center shadow-2xl">
               <span className="text-6xl font-bold text-white">👤</span>
             </div>
@@ -222,7 +237,7 @@ export const RobustVideoCallModal: React.FC<RobustVideoCallModalProps> = ({
 
         {/* Local Video (Picture-in-Picture) */}
         {callState.localStream && callState.isVideoEnabled && (
-          <div className="absolute bottom-4 right-4 w-48 h-36 bg-gray-900 rounded-lg overflow-hidden shadow-lg border-2 border-white">
+          <div className="absolute bottom-20 right-4 w-48 h-36 bg-gray-900 rounded-lg overflow-hidden shadow-lg border-2 border-white z-20">
             <video
               ref={localVideoRef}
               autoPlay
@@ -235,7 +250,7 @@ export const RobustVideoCallModal: React.FC<RobustVideoCallModalProps> = ({
 
         {/* Local Video Disabled Indicator */}
         {callState.localStream && !callState.isVideoEnabled && (
-          <div className="absolute bottom-4 right-4 w-48 h-36 bg-gray-800 rounded-lg shadow-lg border-2 border-red-500 flex items-center justify-center">
+          <div className="absolute bottom-20 right-4 w-48 h-36 bg-gray-800 rounded-lg shadow-lg border-2 border-red-500 flex items-center justify-center z-20">
             <div className="text-center text-white">
               <svg className="w-8 h-8 mx-auto mb-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -276,7 +291,7 @@ export const RobustVideoCallModal: React.FC<RobustVideoCallModalProps> = ({
       </div>
 
       {/* Simple Bottom Controls - Only essential buttons */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-6">
+      <div className="relative bg-gradient-to-t from-black to-transparent p-6 mt-auto">
         <div className="flex items-center justify-center space-x-6">
           {/* Camera Toggle */}
           <button
@@ -344,7 +359,7 @@ export const RobustVideoCallModal: React.FC<RobustVideoCallModalProps> = ({
 
       {/* Call Duration */}
       {callState.isInCall && callState.callDuration > 0 && (
-        <div className="absolute top-4 right-4 z-10">
+        <div className="absolute top-4 right-16 z-10">
           <span className="bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm">
             {formatDuration(callState.callDuration)}
           </span>
@@ -398,6 +413,7 @@ export const RobustVideoCallModal: React.FC<RobustVideoCallModalProps> = ({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

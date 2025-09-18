@@ -1,172 +1,297 @@
-import { SignalingMessage, WS_EVENTS } from '../utils/constants';
+// WebSocket Service for Real-time Communication
+export interface WebSocketMessage {
+  type: 'message' | 'user_joined' | 'user_left' | 'typing' | 'call_offer' | 'call_answer' | 'call_ice_candidate' | 'call_end' | 'call_mute_status' | 'call_video_status' | 'call_ringing' | 'scheduled_message';
+  payload: any;
+  from?: string;
+  to?: string;
+  timestamp?: number;
+}
 
 export class WebSocketService {
   private ws: WebSocket | null = null;
-  private url: string;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
-  private reconnectInterval = 1000;
-  private eventHandlers: Map<string, Function[]> = new Map();
+  private reconnectInterval = 3000;
+  private listeners: Map<string, ((data: any) => void)[]> = new Map();
+  private currentUserId: string | null = null;
+  private isConnecting = false;
+  private connectionPromise: Promise<void> | null = null;
+  private callEndThrottle: Map<string, number> = new Map(); // Throttle call_end messages
 
-  constructor(url: string = 'ws://localhost:8080') {
-    this.url = url;
+  constructor(private serverUrl: string = 'ws://localhost:1883') {
+    // Ensure WebSocket URL uses correct protocol and handles different environments
+    if (typeof window !== 'undefined') {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const hostname = window.location.hostname;
+      
+      // Handle different deployment scenarios
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        this.serverUrl = `${protocol}//localhost:1883`;
+      } else {
+        // For production or different domains, use current host
+        this.serverUrl = `${protocol}//${hostname}:1883`;
+      }
+      
+      console.log('🔌 WebSocket URL determined for', navigator.userAgent.includes('Chrome') ? 'Chrome' : navigator.userAgent.includes('Edge') ? 'Edge' : 'Browser', ':', this.serverUrl);
+    }
   }
 
   connect(userId: string): Promise<void> {
-    return new Promise((resolve, reject) => {
+    if (this.isConnecting && this.connectionPromise) {
+      console.log('🔄 Connection already in progress, returning existing promise');
+      return this.connectionPromise;
+    }
+    
+    if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentUserId === userId) {
+      console.log('✅ Already connected with same user ID');
+      return Promise.resolve();
+    }
+
+    this.isConnecting = true;
+    this.currentUserId = userId;
+
+    this.connectionPromise = new Promise((resolve, reject) => {
+      let connectionTimeout: ReturnType<typeof setTimeout> | null = null;
+      
       try {
-        this.ws = new WebSocket(`${this.url}?userId=${userId}`);
+        // Close existing connection if any
+        if (this.ws) {
+          this.ws.close();
+          this.ws = null;
+        }
         
+        const wsUrl = `${this.serverUrl}?userId=${encodeURIComponent(userId)}&browser=${encodeURIComponent(navigator.userAgent)}`;
+        console.log('🚀 Connecting to WebSocket:', wsUrl);
+        
+        this.ws = new WebSocket(wsUrl);
+        
+        // Set WebSocket properties for better cross-browser compatibility
+        if (this.ws) {
+          this.ws.binaryType = 'arraybuffer'; // Better for binary data
+        }
+
+        // Set timeouts for connection
+        connectionTimeout = setTimeout(() => {
+          if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
+            console.error('⏰ WebSocket connection timeout');
+            this.ws.close();
+            this.isConnecting = false;
+            reject(new Error('Connection timeout'));
+          }
+        }, 10000); // 10 second timeout
+
         this.ws.onopen = () => {
-          console.log('WebSocket connected');
+          if (connectionTimeout) clearTimeout(connectionTimeout);
+          console.log('✅ WebSocket connected to:', this.serverUrl);
+          this.isConnecting = false;
           this.reconnectAttempts = 0;
           resolve();
         };
 
         this.ws.onmessage = (event) => {
           try {
-            const message: SignalingMessage = JSON.parse(event.data);
+            const message: WebSocketMessage = JSON.parse(event.data);
             this.handleMessage(message);
           } catch (error) {
-            console.error('Error parsing WebSocket message:', error);
+            console.error('❌ Error parsing WebSocket message:', error, 'Raw data:', event.data);
           }
         };
 
-        this.ws.onclose = () => {
-          console.log('WebSocket disconnected');
-          this.handleReconnect();
+        this.ws.onclose = (event) => {
+          if (connectionTimeout) clearTimeout(connectionTimeout);
+          console.log('🔴 WebSocket disconnected. Code:', event.code, 'Reason:', event.reason);
+          this.isConnecting = false;
+          this.ws = null;
+          this.connectionPromise = null;
+          
+          // Only attempt reconnection if this wasn't a manual close
+          if (event.code !== 1000) {
+            this.handleReconnect();
+          }
         };
 
         this.ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
+          if (connectionTimeout) clearTimeout(connectionTimeout);
+          console.error('❌ WebSocket error:', error);
+          this.isConnecting = false;
+          this.connectionPromise = null;
           reject(error);
         };
       } catch (error) {
+        if (connectionTimeout) clearTimeout(connectionTimeout);
+        this.isConnecting = false;
+        this.connectionPromise = null;
         reject(error);
       }
     });
+    
+    return this.connectionPromise;
   }
 
-  disconnect(): void {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
-  }
-
-  send(message: SignalingMessage): void {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(message));
-    } else {
-      console.error('WebSocket is not connected');
-    }
-  }
-
-  on(event: string, handler: Function): void {
-    if (!this.eventHandlers.has(event)) {
-      this.eventHandlers.set(event, []);
-    }
-    this.eventHandlers.get(event)!.push(handler);
-  }
-
-  off(event: string, handler: Function): void {
-    const handlers = this.eventHandlers.get(event);
-    if (handlers) {
-      const index = handlers.indexOf(handler);
-      if (index > -1) {
-        handlers.splice(index, 1);
-      }
-    }
-  }
-
-  private handleMessage(message: SignalingMessage): void {
-    const handlers = this.eventHandlers.get(message.type);
-    if (handlers) {
-      handlers.forEach(handler => handler(message));
-    }
-  }
-
-  private handleReconnect(): void {
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+  private handleReconnect() {
+    if (this.reconnectAttempts < this.maxReconnectAttempts && this.currentUserId) {
       this.reconnectAttempts++;
       console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
       
       setTimeout(() => {
-        this.connect('').catch(console.error);
-      }, this.reconnectInterval * this.reconnectAttempts);
-    } else {
-      console.error('Max reconnection attempts reached');
+        if (this.currentUserId) {
+          this.connect(this.currentUserId).catch(error => {
+            console.error('Reconnection failed:', error);
+          });
+        }
+      }, this.reconnectInterval);
     }
   }
 
-  // Convenience methods for call signaling
-  initiateCall(to: string, callId: string, callType: 'audio' | 'video'): void {
-    this.send({
-      type: WS_EVENTS.CALL_INITIATE,
-      from: 'current-user', // This should be replaced with actual user ID
-      to,
-      callId,
-      data: { callType }
+  private handleMessage(message: WebSocketMessage) {
+    console.log('📨 WebSocket received message:', message);
+    const listeners = this.listeners.get(message.type) || [];
+    console.log(`🎯 Found ${listeners.length} listeners for type '${message.type}'`);
+    listeners.forEach(listener => {
+      console.log('🔄 Calling listener with payload:', message.payload);
+      listener(message.payload);
     });
   }
 
-  acceptCall(from: string, callId: string): void {
-    this.send({
-      type: WS_EVENTS.CALL_ACCEPT,
-      from: 'current-user',
-      to: from,
-      callId
+  on(eventType: string, callback: (data: any) => void) {
+    if (!this.listeners.has(eventType)) {
+      this.listeners.set(eventType, []);
+    }
+    this.listeners.get(eventType)!.push(callback);
+  }
+
+  off(eventType: string, callback: (data: any) => void) {
+    const listeners = this.listeners.get(eventType) || [];
+    const index = listeners.indexOf(callback);
+    if (index > -1) {
+      listeners.splice(index, 1);
+    }
+  }
+
+  sendMessage(type: string, payload: any, to?: string) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      const message: WebSocketMessage = {
+        type: type as any,
+        payload,
+        from: this.currentUserId || undefined,
+        to,
+        timestamp: Date.now()
+      };
+      console.log('📤 Sending WebSocket message:', message);
+      this.ws.send(JSON.stringify(message));
+    } else {
+      console.error('❌ WebSocket is not connected - readyState:', this.ws?.readyState);
+    }
+  }
+
+  sendChatMessage(chatId: string, content: string, type: 'text' | 'voice' | 'call-history' = 'text') {
+    console.log('💬 Sending chat message:', { chatId, content, type, senderId: this.currentUserId });
+    this.sendMessage('message', {
+      chatId,
+      content,
+      type,
+      senderId: this.currentUserId
     });
   }
 
-  rejectCall(from: string, callId: string): void {
-    this.send({
-      type: WS_EVENTS.CALL_REJECT,
-      from: 'current-user',
-      to: from,
-      callId
+  sendTypingIndicator(chatId: string, isTyping: boolean) {
+    this.sendMessage('typing', {
+      chatId,
+      isTyping,
+      userId: this.currentUserId
     });
   }
 
-  endCall(to: string, callId: string): void {
-    this.send({
-      type: WS_EVENTS.CALL_END,
-      from: 'current-user',
-      to,
-      callId
+  // Alias for backward compatibility
+  sendTyping(chatId: string, isTyping: boolean) {
+    this.sendTypingIndicator(chatId, isTyping);
+  }
+
+  markMessageAsRead(chatId: string, messageId: string): void {
+    this.sendMessage('message_read', {
+      chatId,
+      messageId
     });
   }
 
-  sendOffer(to: string, offer: RTCSessionDescriptionInit, callId: string): void {
-    this.send({
-      type: WS_EVENTS.OFFER,
-      from: 'current-user',
-      to,
-      callId,
-      data: { offer }
-    });
+  // WebRTC signaling methods
+  sendCallOffer(to: string, offer: RTCSessionDescriptionInit, callType: 'video' | 'audio') {
+    this.sendMessage('call_offer', { offer, callType }, to);
   }
 
-  sendAnswer(to: string, answer: RTCSessionDescriptionInit, callId: string): void {
-    this.send({
-      type: WS_EVENTS.ANSWER,
-      from: 'current-user',
-      to,
-      callId,
-      data: { answer }
-    });
+  sendCallAnswer(to: string, answer: RTCSessionDescriptionInit) {
+    this.sendMessage('call_answer', { answer }, to);
   }
 
-  sendIceCandidate(to: string, candidate: RTCIceCandidateInit, callId: string): void {
-    this.send({
-      type: WS_EVENTS.ICE_CANDIDATE,
-      from: 'current-user',
-      to,
-      callId,
-      data: { candidate }
-    });
+  sendIceCandidate(to: string, candidate: RTCIceCandidateInit) {
+    this.sendMessage('call_ice_candidate', { candidate }, to);
+  }
+
+  sendCallEnd(to: string) {
+    // Throttle call_end messages to prevent infinite loops
+    const now = Date.now();
+    const lastSent = this.callEndThrottle.get(to) || 0;
+    
+    if (now - lastSent < 1000) { // Only allow one call_end per second per user
+      console.log('🛑 Throttling call_end message to', to, '- too frequent');
+      return;
+    }
+    
+    this.callEndThrottle.set(to, now);
+    console.log('📤 Sending throttled call_end to:', to);
+    this.sendMessage('call_end', {}, to);
+    
+    // Clean up old throttle entries
+    setTimeout(() => {
+      this.callEndThrottle.delete(to);
+    }, 5000);
+  }
+
+  sendCallRinging(to: string) {
+    this.sendMessage('call_ringing', {}, to);
+  }
+
+  sendMuteStatus(to: string, isMuted: boolean, userId: string) {
+    this.sendMessage('call_mute_status', { isMuted, userId }, to);
+  }
+
+  sendVideoStatus(to: string, isVideoOff: boolean, userId: string) {
+    console.log('📡 Sending video status:', { to, isVideoOff, userId });
+    this.sendMessage('call_video_status', { videoEnabled: !isVideoOff, userId }, to);
+  }
+
+  disconnect() {
+    console.log('🔴 Disconnecting WebSocket...');
+    this.reconnectAttempts = this.maxReconnectAttempts; // Prevent reconnection
+    
+    if (this.ws) {
+      this.ws.close(1000, 'Manual disconnect'); // Normal closure
+      this.ws = null;
+    }
+    this.currentUserId = null;
+    this.listeners.clear();
+    this.connectionPromise = null;
+    this.isConnecting = false;
+    console.log('✅ WebSocket disconnected and cleaned up');
+  }
+
+  isConnected(): boolean {
+    return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
+  }
+
+  getConnectionState(): string {
+    if (!this.ws) return 'disconnected';
+    
+    switch (this.ws.readyState) {
+      case WebSocket.CONNECTING: return 'connecting';
+      case WebSocket.OPEN: return 'connected';
+      case WebSocket.CLOSING: return 'closing';
+      case WebSocket.CLOSED: return 'disconnected';
+      default: return 'unknown';
+    }
   }
 }
 
 // Singleton instance
 export const webSocketService = new WebSocketService();
+export default webSocketService;

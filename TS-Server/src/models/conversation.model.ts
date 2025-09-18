@@ -6,9 +6,16 @@ interface IMessage extends Document {
   timestamp: Date;
   edited?: boolean;
   edited_at?: Date;
-  message_type: 'text' | 'file' | 'image' | 'voice' | 'video_call' | 'audio_call';
+  message_type: 'text' | 'file' | 'image' | 'voice' | 'video_call' | 'audio_call' | 'call_started' | 'call_ended' | 'screen_share_started' | 'screen_share_ended';
   file_url?: string;
   call_duration?: number; // For call messages
+  call_metadata?: {
+    callId: string;
+    callType: 'audio' | 'video';
+    participants: string[];
+    startTime: Date;
+    endTime?: Date;
+  };
 }
 
 interface IConversation extends Document {
@@ -46,7 +53,7 @@ const messageSchema: Schema = new Schema({
   },
   message_type: {
     type: String,
-    enum: ['text', 'file', 'image', 'voice', 'video_call', 'audio_call'],
+    enum: ['text', 'file', 'image', 'voice', 'video_call', 'audio_call', 'call_started', 'call_ended', 'screen_share_started', 'screen_share_ended'],
     default: 'text'
   },
   file_url: {
@@ -54,6 +61,24 @@ const messageSchema: Schema = new Schema({
   },
   call_duration: {
     type: Number // Duration in seconds
+  },
+  call_metadata: {
+    callId: {
+      type: String
+    },
+    callType: {
+      type: String,
+      enum: ['audio', 'video']
+    },
+    participants: [{
+      type: String
+    }],
+    startTime: {
+      type: Date
+    },
+    endTime: {
+      type: Date
+    }
   }
 });
 

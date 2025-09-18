@@ -545,10 +545,16 @@ export default function MessageInput({
     adjustTextareaHeight();
   }, [message]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSendClick = () => {
+    console.log("🚀 handleSendClick called!");
+    console.log("Message state:", message);
+    console.log("Attached files:", attachedFiles);
+    
     const textContent = editorRef.current?.textContent?.trim() || '';
+    console.log("Text content from editor:", textContent);
+    
     if (textContent || attachedFiles.length > 0) {
+      console.log("✅ Sending message via onSendMessage");
       onSendMessage(message, attachedFiles.length > 0 ? attachedFiles : undefined);
       
       // Clear the contentEditable div
@@ -564,14 +570,25 @@ export default function MessageInput({
       if (onTyping) {
         onTyping(false);
       }
+    } else {
+      console.log("❌ No content to send");
     }
+  };
+
+  // Keep handleSubmit for Enter key functionality
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSendClick();
   };
 
 
   const handleEditorChange = () => {
+    console.log("sdsdsdsdsd---------------------------");
+    
     if (editorRef.current) {
       const content = editorRef.current.innerHTML;
       const textContent = editorRef.current.textContent || '';
+      console.log("📝 Editor changed - HTML:", content, "Text:", textContent);
       setMessage(content);
       if (onTyping) {
         onTyping(textContent.trim().length > 0);
@@ -1015,7 +1032,7 @@ export default function MessageInput({
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="flex items-center space-x-2">
+      <div className="flex items-center space-x-2">
         {/* Message input - Large, prominent rounded rectangle field on the left */}
         <div
           ref={editorRef}
@@ -1131,8 +1148,15 @@ export default function MessageInput({
         <div className="flex bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden">
           {/* Send button - Paper airplane icon */}
           <button
-            type="submit"
-            disabled={disabled || (!editorRef.current?.textContent?.trim() && attachedFiles.length === 0)}
+            type="button"
+            onClick={() => {
+              console.log('🚀 Send button clicked!');
+              console.log('Message content:', message);
+              console.log('Attached files:', attachedFiles.length);
+              console.log('Editor text content:', editorRef.current?.textContent?.trim());
+              handleSendClick();
+            }}
+            disabled={disabled || (!message.trim() && attachedFiles.length === 0)}
             className="flex items-center justify-center p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             title="Send message"
           >
@@ -1168,7 +1192,7 @@ export default function MessageInput({
           onClose={() => setShowScheduler(false)}
           onSchedule={handleSchedule}
         />
-      </form>
+      </div>
     </div>
   );
 }

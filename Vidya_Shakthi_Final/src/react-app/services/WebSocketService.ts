@@ -178,6 +178,12 @@ export class WebSocketService {
         timestamp: Date.now()
       };
       console.log('📤 Sending WebSocket message:', message);
+      console.log('📤 Message details:', {
+        type: message.type,
+        to: message.to,
+        from: message.from,
+        payloadKeys: Object.keys(message.payload)
+      });
       this.ws.send(JSON.stringify(message));
     } else {
       console.error('❌ WebSocket is not connected - readyState:', this.ws?.readyState);

@@ -30,7 +30,12 @@ const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
     if (isOpen && audioRef.current) {
       audioRef.current.loop = true;
       audioRef.current.volume = 0.3;
-      audioRef.current.play().catch(console.error);
+      audioRef.current.play().catch((error) => {
+        // Ignore AbortError as it's expected when component unmounts
+        if (error.name !== 'AbortError') {
+          console.error('Audio play error:', error);
+        }
+      });
     } else if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;

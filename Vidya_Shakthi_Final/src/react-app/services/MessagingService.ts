@@ -9,7 +9,7 @@ export interface Message {
   senderName: string;
   content: string;
   timestamp: string;
-  messageType: 'text' | 'image' | 'file' | 'audio' | 'call_started' | 'call_ended' | 'screen_share_started' | 'screen_share_ended';
+  messageType: 'text' | 'image' | 'file' | 'audio' | 'call_started' | 'call_ended' | 'call_history' | 'screen_share_started' | 'screen_share_ended';
   fileUrl?: string;
   callMetadata?: {
     callId: string;

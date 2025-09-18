@@ -39,6 +39,9 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   }, [isInCall, isVideoCall, onToggleScreenShare, initiateCall, user]);
 
   const handleAudioCall = useCallback(() => {
+
+    console.log("---------------- initiateCall",user);
+    
     initiateCall(user, 'audio');
   }, [initiateCall, user]);
 

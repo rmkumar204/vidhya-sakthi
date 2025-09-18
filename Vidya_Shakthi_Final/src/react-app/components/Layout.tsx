@@ -4,7 +4,11 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import { useTheme } from '@/react-app/contexts/ThemeContext';
 
-export default function Layout() {
+interface LayoutProps {
+  onInitiateCall?: (toUserId: string, callType: 'audio' | 'video') => void;
+}
+
+export default function Layout({ onInitiateCall }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { isDark } = useTheme();
 

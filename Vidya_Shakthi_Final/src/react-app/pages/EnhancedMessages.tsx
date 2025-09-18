@@ -13,9 +13,9 @@ import Avatar from '@/react-app/components/Avatar';
 import { useAuth } from '@/react-app/hooks/useAuth';
 import { useWebRTC } from '@/react-app/hooks/useWebRTC';
 import { useCallSignaling } from '@/react-app/hooks/useCallSignaling';
-import VideoCallView from '@/react-app/components/VideoCallView';
-import AudioCallView from '@/react-app/components/AudioCallView';
-import IncomingCallModal from '@/react-app/components/IncomingCallModal';
+// import VideoCallView from '@/react-app/components/VideoCallView'; // Now handled globally by AppWithCalls
+// import AudioCallView from '@/react-app/components/AudioCallView'; // Now handled globally by AppWithCalls
+// import IncomingCallModal from '@/react-app/components/IncomingCallModal'; // Now handled globally by AppWithCalls
 import { messagingService, Message, Chat, Connection } from '@/react-app/services/MessagingService';
 import { webSocketService } from '@/react-app/services/WebSocketService';
 import { getConversations, getConversation, sendMessage as sendConversationMessage, Conversation, ConversationMessage } from '@/react-app/services/ConversationService';
@@ -42,7 +42,11 @@ const renderFormattedText = (text: string) => {
   return text;
 };
 
-export default function EnhancedMessages() {
+interface EnhancedMessagesProps {
+  onInitiateCall?: (toUserId: string, callType: 'audio' | 'video') => void;
+}
+
+export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesProps) {
   const { user } = useAuth();
   const [selectedChat, setSelectedChat] = useState<string | null>(null);
   const selectedChatRef = useRef<string | null>(null);
@@ -71,19 +75,18 @@ export default function EnhancedMessages() {
 
   // Call signaling hook for comprehensive call management
   const {
-    call: activeCall,
-    localStream: callLocalStream,
-    remoteStream: callRemoteStream,
-    incomingCall: signalingIncomingCall,
-    callState: signalingCallState,
-    initiateCall: initiateSignalingCall,
-    acceptCall: acceptSignalingCall,
-    rejectCall: rejectSignalingCall,
-    endCall: endSignalingCall,
-    toggleAudio: toggleSignalingAudio,
-    toggleVideo: toggleSignalingVideo,
-    startScreenShare: startSignalingScreenShare,
-    stopScreenShare: stopSignalingScreenShare
+    // call: activeCall, // Now handled globally by AppWithCalls
+    // localStream: callLocalStream, // Now handled globally by AppWithCalls
+    // remoteStream: callRemoteStream, // Now handled globally by AppWithCalls
+    // incomingCall: signalingIncomingCall, // Now handled globally by AppWithCalls
+    // callState: signalingCallState, // Now handled globally by AppWithCalls
+    // acceptCall: acceptSignalingCall, // Now handled globally by AppWithCalls
+    // rejectCall: rejectSignalingCall, // Now handled globally by AppWithCalls
+    // endCall: endSignalingCall, // Now handled globally by AppWithCalls
+    // toggleAudio: toggleSignalingAudio, // Now handled globally by AppWithCalls
+    // toggleVideo: toggleSignalingVideo, // Now handled globally by AppWithCalls
+    // startScreenShare: startSignalingScreenShare, // Now handled globally by AppWithCalls
+    // stopScreenShare: stopSignalingScreenShare // Now handled globally by AppWithCalls
   } = useCallSignaling(user?.id || '', user?.name || '');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -99,6 +102,7 @@ export default function EnhancedMessages() {
       // Remove WebSocket event listeners
       webSocketService.off('message', () => {});
       webSocketService.off('typing', () => {});
+      webSocketService.off('call_history', () => {});
     };
   }, [user?.id]);
 
@@ -437,6 +441,39 @@ export default function EnhancedMessages() {
       console.log('📞 Call ended:', payload);
       toast.success('Call ended');
     });
+
+    // Handle call history messages
+    webSocketService.on('call_history', (payload: any) => {
+      console.log('📞 Call history received:', payload);
+      
+      // Create call history message
+      const callHistoryMessage: Message = {
+        id: payload.id || `call-history-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        chatId: payload.chatId,
+        senderId: payload.senderId || 'system',
+        senderName: payload.senderName || 'System',
+        content: payload.content,
+        timestamp: payload.timestamp || new Date().toISOString(),
+        messageType: 'call_history',
+        isRead: false,
+        isDelivered: true
+      };
+
+      // Add to messages if it's for the current chat
+      if (payload.chatId === selectedChat) {
+        setMessages(prev => {
+          // Check if message already exists
+          const exists = prev.some(msg => msg.id === callHistoryMessage.id);
+          if (exists) {
+            console.log('Call history message already exists, skipping');
+            return prev;
+          }
+          
+          console.log('Adding call history message:', callHistoryMessage);
+          return [...prev, callHistoryMessage];
+        });
+      }
+    });
   };
 
   const loadChats = () => {
@@ -685,72 +722,46 @@ export default function EnhancedMessages() {
     }
   };
 
-  // Call handling
-  const handleStartAudioCall = async () => {
-    if (selectedChat) {
-      const otherParticipant = chats.find(c => c.id === selectedChat)?.participants.find(p => p !== user?.id);
-      if (otherParticipant) {
-        try {
-          await initiateSignalingCall(otherParticipant, 'audio');
-        } catch (error) {
-          console.error('Failed to start audio call:', error);
-          toast.error('Failed to start audio call');
-        }
-      }
-    }
-  };
+  // Call handling - now handled by onInitiateCall prop
 
-  const handleStartVideoCall = async () => {
-    if (selectedChat) {
-      const otherParticipant = chats.find(c => c.id === selectedChat)?.participants.find(p => p !== user?.id);
-      if (otherParticipant) {
-        try {
-          await initiateSignalingCall(otherParticipant, 'video');
-        } catch (error) {
-          console.error('Failed to start video call:', error);
-          toast.error('Failed to start video call');
-        }
-      }
-    }
-  };
+  // const handleStartScreenShare = async () => {
+  //   try {
+  //     if (signalingCallState.isScreenSharing) {
+  //       await stopSignalingScreenShare();
+  //     } else {
+  //       await startSignalingScreenShare();
+  //     }
+  //   } catch (error) {
+  //     console.error('Failed to toggle screen share:', error);
+  //     toast.error('Failed to toggle screen share');
+  //   }
+  // };
 
-  const handleStartScreenShare = async () => {
-    try {
-      if (signalingCallState.isScreenSharing) {
-        await stopSignalingScreenShare();
-      } else {
-        await startSignalingScreenShare();
-      }
-    } catch (error) {
-      console.error('Failed to toggle screen share:', error);
-      toast.error('Failed to toggle screen share');
-    }
-  };
+  // Call handlers are now managed globally by AppWithCalls
+  // const handleAcceptCall = async () => {
+  //   try {
+  //     await acceptSignalingCall();
+  //   } catch (error) {
+  //     console.error('Failed to accept call:', error);
+  //     toast.error('Failed to accept call');
+  //   }
+  // };
 
-  const handleAcceptCall = async () => {
-    try {
-      await acceptSignalingCall();
-    } catch (error) {
-      console.error('Failed to accept call:', error);
-      toast.error('Failed to accept call');
-    }
-  };
+  // const handleRejectCall = () => {
+  //   rejectSignalingCall();
+  // };
 
-  const handleRejectCall = () => {
-    rejectSignalingCall();
-  };
+  // const handleEndCall = () => {
+  //   endSignalingCall();
+  // };
 
-  const handleEndCall = () => {
-    endSignalingCall();
-  };
+  // const handleToggleAudio = () => {
+  //   toggleSignalingAudio();
+  // };
 
-  const handleToggleAudio = () => {
-    toggleSignalingAudio();
-  };
-
-  const handleToggleVideo = () => {
-    toggleSignalingVideo();
-  };
+  // const handleToggleVideo = () => {
+  //   toggleSignalingVideo();
+  // };
 
 
   // Utility functions
@@ -869,6 +880,15 @@ export default function EnhancedMessages() {
       );
     }
 
+    if (message.messageType === 'call_history') {
+      return (
+        <div className="flex items-center space-x-2 text-blue-600 dark:text-blue-400">
+          <PhoneIcon className="h-4 w-4" />
+          <span className="text-sm font-medium">{message.content}</span>
+        </div>
+      );
+    }
+
     if (message.messageType === 'screen_share_started') {
       return (
         <div className="flex items-center space-x-2 text-blue-600 dark:text-blue-400">
@@ -916,54 +936,8 @@ export default function EnhancedMessages() {
 
   // Render call modal
   const renderCallModal = () => {
-    // Incoming call modal
-    if (signalingIncomingCall) {
-      return (
-        <IncomingCallModal
-          isOpen={true}
-          callType={signalingIncomingCall.callType}
-          callerName={signalingIncomingCall.fromUserName}
-          onAccept={handleAcceptCall}
-          onReject={handleRejectCall}
-        />
-      );
-    }
-
-    // Active call views
-    if (activeCall && signalingCallState.isInCall) {
-      if (activeCall.type === 'video') {
-        return (
-          <VideoCallView
-            localStream={callLocalStream}
-            remoteStream={callRemoteStream}
-            isAudioEnabled={signalingCallState.isAudioEnabled}
-            isVideoEnabled={signalingCallState.isVideoEnabled}
-            isScreenSharing={signalingCallState.isScreenSharing}
-            callDuration={signalingCallState.callDuration}
-            connectionStatus={signalingCallState.connectionStatus}
-            onToggleAudio={handleToggleAudio}
-            onToggleVideo={handleToggleVideo}
-            onToggleScreenShare={handleStartScreenShare}
-            onEndCall={handleEndCall}
-            remoteUserName={activeCall.fromUserId}
-          />
-        );
-      } else {
-        return (
-          <AudioCallView
-            localStream={callLocalStream}
-            remoteStream={callRemoteStream}
-            isAudioEnabled={signalingCallState.isAudioEnabled}
-            callDuration={signalingCallState.callDuration}
-            connectionStatus={signalingCallState.connectionStatus}
-            onToggleAudio={handleToggleAudio}
-            onEndCall={handleEndCall}
-            remoteUserName={activeCall.fromUserId}
-          />
-        );
-      }
-    }
-
+    // Note: All call modals (incoming, active, outgoing) are now handled globally by AppWithCalls.tsx
+    // This function is kept for compatibility but returns null
     return null;
   };
 
@@ -1149,20 +1123,31 @@ export default function EnhancedMessages() {
                     </p>
                   </div>
                 </div>
+                
                 <div className="flex items-center space-x-2">
                   <button
-                    onClick={handleStartAudioCall}
-                    disabled={!selectedChatData.isOnline}
+                    onClick={() => {
+                      const otherUserId = selectedChatData.participants?.find(id => id !== user?.id) || (selectedChatData as any).userId;
+                      if (otherUserId && onInitiateCall) {
+                        onInitiateCall(otherUserId, 'audio');
+                      }
+                    }}
+                    disabled={!selectedChatData.isOnline || !onInitiateCall}
                     title={selectedChatData.isOnline ? 'Start audio call' : 'User offline'}
-                    className={`p-2 rounded-lg transition-colors ${selectedChatData.isOnline ? 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' : 'text-gray-400 cursor-not-allowed'}`}
+                    className={`p-2 rounded-lg transition-colors ${selectedChatData.isOnline && onInitiateCall ? 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' : 'text-gray-400 cursor-not-allowed'}`}
                   >
                     <PhoneIcon className="h-5 w-5" />
                   </button>
                   <button
-                    onClick={handleStartVideoCall}
-                    disabled={!selectedChatData.isOnline}
+                    onClick={() => {
+                      const otherUserId = selectedChatData.participants?.find(id => id !== user?.id) || (selectedChatData as any).userId;
+                      if (otherUserId && onInitiateCall) {
+                        onInitiateCall(otherUserId, 'video');
+                      }
+                    }}
+                    disabled={!selectedChatData.isOnline || !onInitiateCall}
                     title={selectedChatData.isOnline ? 'Start video call' : 'User offline'}
-                    className={`p-2 rounded-lg transition-colors ${selectedChatData.isOnline ? 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' : 'text-gray-400 cursor-not-allowed'}`}
+                    className={`p-2 rounded-lg transition-colors ${selectedChatData.isOnline && onInitiateCall ? 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' : 'text-gray-400 cursor-not-allowed'}`}
                   >
                     <VideoCameraIcon className="h-5 w-5" />
                   </button>

@@ -36,6 +36,7 @@ class SignalingServer {
 
       console.log(`User ${userId} connected`);
       this.clients.set(userId, ws);
+      console.log(`📋 Total connected users: ${this.clients.size}`, Array.from(this.clients.keys()));
 
       // Send connection confirmation
       ws.send(JSON.stringify({
@@ -56,6 +57,7 @@ class SignalingServer {
       ws.on('close', () => {
         console.log(`User ${userId} disconnected`);
         this.clients.delete(userId);
+        console.log(`📋 Remaining connected users: ${this.clients.size}`, Array.from(this.clients.keys()));
         this.broadcastUserLeft(userId);
       });
 
@@ -72,6 +74,9 @@ class SignalingServer {
 
   handleMessage(fromUserId, message) {
     const { type, payload, to } = message;
+
+    // Store the 'to' field for use in handlers
+    this.currentMessageTo = to;
 
     switch (type) {
       case 'message':
@@ -328,19 +333,45 @@ class SignalingServer {
   }
 
   handleCallOffer(fromUserId, payload) {
-    const { targetUserId, callId, offer } = payload;
+    console.log("📞 Handling call offer from", fromUserId, ":", payload);
+    const { targetUserId, toUserId, callId, offer, callType, fromUserName } = payload;
     
-    const targetClient = this.clients.get(targetUserId);
+    // Support multiple ways to get target user ID:
+    // 1. From message 'to' field (set by WebSocketService.sendMessage)
+    // 2. From payload targetUserId field
+    // 3. From payload toUserId field
+    const targetUser = this.currentMessageTo || targetUserId || toUserId;
+    
+    if (!targetUser) {
+      console.error("❌ No target user ID found in call offer. Checked:", {
+        messageTo: this.currentMessageTo,
+        targetUserId,
+        toUserId,
+        payload
+      });
+      return;
+    }
+    
+    console.log("🎯 Target user for call offer:", targetUser);
+    
+    const targetClient = this.clients.get(targetUser);
     if (targetClient && targetClient.readyState === WebSocket.OPEN) {
+      console.log("📤 Sending call offer to user", targetUser);
       targetClient.send(JSON.stringify({
-        type: 'offer',
+        type: 'call_offer',
         payload: {
-          fromUserId,
           callId,
+          fromUserId,
+          fromUserName: fromUserName || `User ${fromUserId.substr(-4)}`,
           offer,
+          callType: callType || 'audio',
           timestamp: new Date().toISOString()
         }
       }));
+      console.log("✅ Call offer sent successfully to", targetUser);
+    } else {
+      console.error("❌ Target user", targetUser, "not connected or WebSocket not open. ReadyState:", targetClient?.readyState);
+      console.log("📋 Available connected users:", Array.from(this.clients.keys()));
     }
   }
 

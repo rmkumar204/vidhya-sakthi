@@ -1,45 +1,42 @@
-import React, { useRef, useEffect } from 'react';
-import {
-  PhoneIcon,
-  VideoCameraIcon,
-  MicrophoneIcon,
-  SpeakerXMarkIcon,
-  ComputerDesktopIcon,
-  XMarkIcon
-} from '@heroicons/react/24/outline';
+import React, { useRef, useEffect, useState } from 'react';
+import { Call, User } from '../types';
 
 interface VideoCallViewProps {
+  call: Call;
+  user: User;
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
   isAudioEnabled: boolean;
   isVideoEnabled: boolean;
   isScreenSharing: boolean;
+  connectionQuality: 'excellent' | 'good' | 'fair' | 'poor';
   callDuration: number;
-  connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'failed';
   onToggleAudio: () => void;
   onToggleVideo: () => void;
   onToggleScreenShare: () => void;
   onEndCall: () => void;
-  remoteUserName?: string;
 }
 
-const VideoCallView: React.FC<VideoCallViewProps> = ({
+export const VideoCallView: React.FC<VideoCallViewProps> = ({
+  call,
+  user,
   localStream,
   remoteStream,
   isAudioEnabled,
   isVideoEnabled,
   isScreenSharing,
+  connectionQuality,
   callDuration,
-  connectionStatus,
   onToggleAudio,
   onToggleVideo,
   onToggleScreenShare,
-  onEndCall,
-  remoteUserName = 'Remote User'
+  onEndCall
 }) => {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const localAudioRef = useRef<HTMLAudioElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
+  const [isLocalVideoMuted] = useState(false);
 
   // Setup local video stream
   useEffect(() => {
@@ -55,6 +52,14 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({
     }
   }, [remoteStream]);
 
+  // Setup local audio stream (for monitoring)
+  useEffect(() => {
+    if (localAudioRef.current && localStream) {
+      localAudioRef.current.srcObject = localStream;
+      localAudioRef.current.volume = 0.1; // Low volume for monitoring
+    }
+  }, [localStream]);
+
   // Setup remote audio stream
   useEffect(() => {
     if (remoteAudioRef.current && remoteStream) {
@@ -63,58 +68,71 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({
   }, [remoteStream]);
 
   // Format call duration
-  const formatDuration = (seconds: number): string => {
+  const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-
+    
     if (hours > 0) {
-      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
-    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Get connection status color
-  const getConnectionStatusColor = () => {
-    switch (connectionStatus) {
-      case 'connected':
-        return 'text-green-500';
-      case 'connecting':
-        return 'text-yellow-500';
-      case 'failed':
-        return 'text-red-500';
-      default:
-        return 'text-gray-500';
+  // Get connection quality color
+  const getQualityColor = (quality: string) => {
+    switch (quality) {
+      case 'excellent': return 'text-green-500';
+      case 'good': return 'text-blue-500';
+      case 'fair': return 'text-yellow-500';
+      case 'poor': return 'text-red-500';
+      default: return 'text-gray-500';
+    }
+  };
+
+  // Get connection quality indicator
+  const getQualityIndicator = (quality: string) => {
+    switch (quality) {
+      case 'excellent': return '🟢';
+      case 'good': return '🔵';
+      case 'fair': return '🟡';
+      case 'poor': return '🔴';
+      default: return '⚪';
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black z-50 flex flex-col">
-      {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/50 to-transparent p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className={`w-3 h-3 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' : connectionStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
-            <div>
-              <h2 className="text-white text-lg font-semibold">{remoteUserName}</h2>
-              <p className={`text-sm ${getConnectionStatusColor()}`}>
-                {connectionStatus === 'connected' ? 'Connected' : 
-                 connectionStatus === 'connecting' ? 'Connecting...' : 
-                 connectionStatus === 'failed' ? 'Connection Failed' : 'Disconnected'}
-              </p>
+    <div className="fixed inset-0 bg-black flex flex-col z-50">
+      {/* Header with call info and connection status */}
+      <div className="absolute top-0 left-0 right-0 bg-black bg-opacity-50 text-white p-4 z-10">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">{getQualityIndicator(connectionQuality)}</span>
+              <span className={`text-sm ${getQualityColor(connectionQuality)}`}>
+                {connectionQuality.toUpperCase()}
+              </span>
+            </div>
+            <div className="text-sm">
+              {formatDuration(callDuration)}
             </div>
           </div>
-          <div className="text-white text-sm font-mono">
-            {formatDuration(callDuration)}
+          <div className="text-right">
+            <div className="text-lg font-semibold">
+              {call.to?.name || call.from?.name || 'Unknown User'}
+            </div>
+            <div className="text-sm text-gray-300">
+              {isScreenSharing ? 'Screen Sharing' : 'Video Call'}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Main Video Area */}
+      {/* Main video area */}
       <div className="flex-1 relative">
-        {/* Remote Video (Full Screen) */}
-        <div className="absolute inset-0 bg-gray-900">
-          {remoteStream ? (
+        {/* Remote video (full screen) */}
+        <div className="absolute inset-0">
+          {remoteStream && !isLocalVideoMuted ? (
             <video
               ref={remoteVideoRef}
               autoPlay
@@ -123,20 +141,27 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="flex items-center justify-center h-full">
+            <div className="w-full h-full bg-gradient-to-br from-purple-900 to-blue-900 flex items-center justify-center">
               <div className="text-center text-white">
-                <div className="w-32 h-32 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-4xl">👤</span>
+                <div className="w-32 h-32 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center shadow-2xl mx-auto mb-6">
+                  <span className="text-4xl font-bold">
+                    {(call.to?.name || call.from?.name || 'U').charAt(0).toUpperCase()}
+                  </span>
                 </div>
-                <p className="text-xl font-semibold">{remoteUserName}</p>
-                <p className="text-gray-400">Waiting for video...</p>
+                <h2 className="text-2xl font-semibold mb-2">
+                  {call.to?.name || call.from?.name || 'Unknown User'}
+                </h2>
+                <div className="flex items-center justify-center space-x-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-gray-400 text-sm">Online</span>
+                </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Local Video (Picture-in-Picture) */}
-        <div className="absolute bottom-4 right-4 w-64 h-48 bg-gray-800 rounded-lg overflow-hidden shadow-2xl border-2 border-white/20">
+        {/* Local video (picture-in-picture) */}
+        <div className="absolute bottom-4 right-4 w-48 h-36 bg-black rounded-lg overflow-hidden shadow-2xl border-2 border-white">
           {localStream && isVideoEnabled ? (
             <video
               ref={localVideoRef}
@@ -146,126 +171,92 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="flex items-center justify-center h-full bg-gray-700">
+            <div className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800 flex items-center justify-center">
               <div className="text-center text-white">
-                <div className="w-16 h-16 bg-gray-600 rounded-full flex items-center justify-center mx-auto mb-2">
-                  <span className="text-2xl">👤</span>
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <span className="text-lg font-bold">
+                    {user.name.charAt(0).toUpperCase()}
+                  </span>
                 </div>
-                <p className="text-sm">Your Camera</p>
-                <p className="text-xs text-gray-400">Off</p>
+                <div className="text-xs">
+                  {isVideoEnabled ? 'You' : 'Video Off'}
+                </div>
               </div>
             </div>
           )}
-          
-          {/* Local Video Overlay */}
-          <div className="absolute top-2 left-2 right-2 flex justify-between items-center">
-            <div className="flex space-x-1">
-              {!isAudioEnabled && (
-                <div className="bg-red-500 text-white px-2 py-1 rounded text-xs font-semibold">
-                  Muted
-                </div>
-              )}
-              {!isVideoEnabled && (
-                <div className="bg-red-500 text-white px-2 py-1 rounded text-xs font-semibold">
-                  Camera Off
-                </div>
-              )}
-            </div>
-            {isScreenSharing && (
-              <div className="bg-blue-500 text-white px-2 py-1 rounded text-xs font-semibold">
-                Screen Sharing
-              </div>
-            )}
-          </div>
         </div>
-
-        {/* Remote Audio (Hidden) */}
-        {remoteStream && (
-          <audio
-            ref={remoteAudioRef}
-            autoPlay
-            playsInline
-            className="hidden"
-          />
-        )}
       </div>
 
-      {/* Control Bar */}
-      <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-6">
-        <div className="flex items-center justify-center space-x-4">
-          {/* Audio Toggle */}
+      {/* Audio elements (hidden) */}
+      <audio ref={localAudioRef} autoPlay muted />
+      <audio ref={remoteAudioRef} autoPlay />
+
+      {/* Control bar */}
+      <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-75 text-white p-6">
+        <div className="flex justify-center items-center space-x-6">
+          {/* Audio toggle */}
           <button
             onClick={onToggleAudio}
-            className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
+            className={`p-4 rounded-full transition-colors ${
               isAudioEnabled 
-                ? 'bg-gray-600 hover:bg-gray-500 text-white' 
-                : 'bg-red-500 hover:bg-red-600 text-white'
+                ? 'bg-gray-600 hover:bg-gray-700' 
+                : 'bg-red-500 hover:bg-red-600'
             }`}
             title={isAudioEnabled ? 'Mute' : 'Unmute'}
           >
-            {isAudioEnabled ? (
-              <MicrophoneIcon className="w-6 h-6" />
-            ) : (
-              <SpeakerXMarkIcon className="w-6 h-6" />
-            )}
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {isAudioEnabled ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+              )}
+            </svg>
           </button>
 
-          {/* Video Toggle */}
+          {/* Video toggle */}
           <button
             onClick={onToggleVideo}
-            className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
+            className={`p-4 rounded-full transition-colors ${
               isVideoEnabled 
-                ? 'bg-gray-600 hover:bg-gray-500 text-white' 
-                : 'bg-red-500 hover:bg-red-600 text-white'
+                ? 'bg-gray-600 hover:bg-gray-700' 
+                : 'bg-red-500 hover:bg-red-600'
             }`}
-            title={isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
+            title={isVideoEnabled ? 'Turn off video' : 'Turn on video'}
           >
-            {isVideoEnabled ? (
-              <VideoCameraIcon className="w-6 h-6" />
-            ) : (
-              <XMarkIcon className="w-6 h-6" />
-            )}
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {isVideoEnabled ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              )}
+            </svg>
           </button>
 
-          {/* Screen Share Toggle */}
+          {/* Screen share toggle */}
           <button
             onClick={onToggleScreenShare}
-            className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
+            className={`p-4 rounded-full transition-colors ${
               isScreenSharing 
-                ? 'bg-blue-500 hover:bg-blue-600 text-white' 
-                : 'bg-gray-600 hover:bg-gray-500 text-white'
+                ? 'bg-blue-500 hover:bg-blue-600' 
+                : 'bg-gray-600 hover:bg-gray-700'
             }`}
             title={isScreenSharing ? 'Stop sharing' : 'Share screen'}
           >
-            <ComputerDesktopIcon className="w-6 h-6" />
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
           </button>
 
-          {/* End Call */}
+          {/* End call */}
           <button
             onClick={onEndCall}
-            className="w-12 h-12 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-colors"
+            className="p-4 rounded-full bg-red-500 hover:bg-red-600 transition-colors"
             title="End call"
           >
-            <PhoneIcon className="w-6 h-6 rotate-45" />
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
-        </div>
-
-        {/* Connection Quality Indicator */}
-        <div className="flex justify-center mt-4">
-          <div className="flex space-x-1">
-            {[1, 2, 3, 4, 5].map((bar) => (
-              <div
-                key={bar}
-                className={`w-1 h-4 rounded-full ${
-                  connectionStatus === 'connected' && bar <= 4
-                    ? 'bg-green-500'
-                    : connectionStatus === 'connecting' && bar <= 2
-                    ? 'bg-yellow-500'
-                    : 'bg-gray-500'
-                }`}
-              />
-            ))}
-          </div>
         </div>
       </div>
     </div>

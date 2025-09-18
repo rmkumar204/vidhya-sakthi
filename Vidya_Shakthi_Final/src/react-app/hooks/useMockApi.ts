@@ -74,11 +74,11 @@ export const useMockApi = (currentUserId: string | null) => {
     setLoading(true);
     
     // Load chats from localStorage
-    const savedChats = localStorageService.get<Chat[]>('chats', []);
+    const savedChats = localStorageService.getChats();
     setChats(savedChats);
     
     // Load connection requests from localStorage
-    const savedRequests = localStorageService.get<ConnectionRequest[]>('connectionRequests', []);
+    const savedRequests = localStorageService.getConnections();
     setConnectionRequests(savedRequests);
     
     setLoading(false);
@@ -103,17 +103,17 @@ export const useMockApi = (currentUserId: string | null) => {
     };
 
     setConnectionRequests(prev => [...prev, newRequest]);
-    localStorageService.set('connectionRequests', [...connectionRequests, newRequest]);
+    localStorageService.saveConnection(newRequest);
 
     // Send via WebSocket
-    webSocketService.send('connection_request', {
+    webSocketService.sendMessage('connection_request', {
       connectionId: newRequest.id,
       fromUserId: currentUserId,
       toUserId,
       fromUserName: fromUser.name,
       toUserName: toUser.name,
       timestamp: newRequest.createdAt
-    });
+    }, toUserId);
   }, [currentUserId, users, connectionRequests]);
 
   const handleConnectionRequest = useCallback(async (requestId: string, action: 'accept' | 'reject') => {
@@ -131,23 +131,27 @@ export const useMockApi = (currentUserId: string | null) => {
       };
 
       setChats(prev => [...prev, newChat]);
-      localStorageService.set('chats', [...chats, newChat]);
+      localStorageService.saveChat(newChat);
 
       // Send accept via WebSocket
-      webSocketService.send('connection_accept', {
+      webSocketService.sendMessage('connection_accept', {
         connectionId: requestId,
         timestamp: new Date().toISOString()
-      });
+      }, request.fromUserId);
     } else {
       // Send reject via WebSocket
-      webSocketService.send('connection_reject', {
+      webSocketService.sendMessage('connection_reject', {
         connectionId: requestId
-      });
+      }, request.fromUserId);
     }
 
     // Remove the request
     setConnectionRequests(prev => prev.filter(r => r.id !== requestId));
-    localStorageService.set('connectionRequests', connectionRequests.filter(r => r.id !== requestId));
+    // Note: We don't have a deleteConnection method, so we'll update the status instead
+    const connection = connectionRequests.find(r => r.id === requestId);
+    if (connection) {
+      localStorageService.updateConnectionStatus(requestId, 'rejected');
+    }
   }, [connectionRequests, chats]);
 
   const sendMessage = useCallback(async (chatId: string, senderId: string, content: string, type: 'text' | 'voice' = 'text') => {
@@ -179,12 +183,13 @@ export const useMockApi = (currentUserId: string | null) => {
     });
 
     setChats(updatedChats);
-    localStorageService.set('chats', updatedChats);
+    // Update the chat in localStorage
+    localStorageService.saveChat(updatedChat);
 
     // Send via WebSocket
     const otherUserId = chat.userIds.find(id => id !== senderId);
     if (otherUserId) {
-      webSocketService.send('message', {
+      webSocketService.sendMessage('message', {
         chatId,
         content,
         senderId,
@@ -227,7 +232,8 @@ export const useMockApi = (currentUserId: string | null) => {
           return chat;
         });
         
-        localStorageService.set('chats', updatedChats);
+        // Update chats in localStorage
+        updatedChats.forEach(chat => localStorageService.saveChat(chat));
         return updatedChats;
       });
 
@@ -267,7 +273,7 @@ export const useMockApi = (currentUserId: string | null) => {
       };
 
       setConnectionRequests(prev => [...prev, newRequest]);
-      localStorageService.set('connectionRequests', [...connectionRequests, newRequest]);
+      localStorageService.saveConnection(newRequest);
     };
 
     webSocketService.on('message', handleMessage);

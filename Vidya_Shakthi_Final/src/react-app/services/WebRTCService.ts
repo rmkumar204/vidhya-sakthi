@@ -39,12 +39,17 @@ export interface CallState {
   callType: 'video' | 'audio' | null;
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
-  connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'failed';
+  connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'failed' | 'reconnecting';
   isAudioEnabled: boolean;
   isVideoEnabled: boolean;
   isScreenSharing: boolean;
   callDuration: number;
   error: string | null;
+  isMuted: boolean;
+  isVideoOff: boolean;
+  connectionQuality: 'excellent' | 'good' | 'fair' | 'poor';
+  iceConnectionState: RTCIceConnectionState;
+  peerConnectionState: RTCPeerConnectionState;
 }
 
 export interface Call {
@@ -112,7 +117,12 @@ export class WebRTCService extends EventEmitter {
       isVideoEnabled: this.isVideoEnabled(),
       isScreenSharing: this.screenStream !== null,
       callDuration: this.getCallDuration(),
-      error: null
+      error: null,
+      isMuted: !this.isAudioEnabled(),
+      isVideoOff: !this.isVideoEnabled(),
+      connectionQuality: this.getConnectionQuality(),
+      iceConnectionState: this.peerConnection?.iceConnectionState || 'disconnected',
+      peerConnectionState: this.peerConnection?.connectionState || 'disconnected'
     };
   }
 
@@ -123,6 +133,9 @@ export class WebRTCService extends EventEmitter {
     onRemoteStream: (stream: MediaStream) => void,
     onCallEnd: () => void
   ): Promise<void> {
+
+    console.log("-------------------init callll");
+    
     if (this.isInCall()) {
       throw new Error('Already in a call');
     }
@@ -447,6 +460,9 @@ export class WebRTCService extends EventEmitter {
   private createPeerConnection(): void {
     this.peerConnection = new RTCPeerConnection(this.iceServers);
 
+    // Setup enhanced connection state handlers
+    this.setupConnectionStateHandlers();
+
     // Handle ICE candidates
     this.peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
@@ -588,6 +604,62 @@ export class WebRTCService extends EventEmitter {
 
     // Reset current call
     this.currentCall = null;
+  }
+
+  // Get connection quality based on ICE connection state
+  private getConnectionQuality(): 'excellent' | 'good' | 'fair' | 'poor' {
+    if (!this.peerConnection) return 'poor';
+    
+    const iceState = this.peerConnection.iceConnectionState;
+    const connectionState = this.peerConnection.connectionState;
+    
+    if (iceState === 'connected' && connectionState === 'connected') {
+      return 'excellent';
+    } else if (iceState === 'completed' && connectionState === 'connected') {
+      return 'good';
+    } else if (iceState === 'checking' || connectionState === 'connecting') {
+      return 'fair';
+    } else {
+      return 'poor';
+    }
+  }
+
+  // Enhanced connection state management with reconnection logic
+  private setupConnectionStateHandlers(): void {
+    if (!this.peerConnection) return;
+
+    this.peerConnection.oniceconnectionstatechange = () => {
+      const state = this.peerConnection?.iceConnectionState;
+      console.log('ICE Connection State:', state);
+      
+      if (state === 'failed' || state === 'disconnected') {
+        console.log('Connection failed or disconnected, attempting reconnection...');
+        this.emit('call_state_changed', this.getCallState());
+        
+        // Attempt reconnection for failed connections
+        if (state === 'failed' && !this.isEnding) {
+          setTimeout(() => {
+            if (this.peerConnection && this.peerConnection.iceConnectionState === 'failed') {
+              console.log('Attempting to restart ICE...');
+              this.peerConnection.restartIce();
+            }
+          }, 2000);
+        }
+      }
+    };
+
+    this.peerConnection.onconnectionstatechange = () => {
+      const state = this.peerConnection?.connectionState;
+      console.log('Peer Connection State:', state);
+      
+      if (state === 'failed') {
+        console.log('Peer connection failed');
+        this.emit('call_state_changed', this.getCallState());
+      } else if (state === 'connected') {
+        console.log('Peer connection established');
+        this.emit('call_state_changed', this.getCallState());
+      }
+    };
   }
 }
 

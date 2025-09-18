@@ -10,6 +10,20 @@ export interface IncomingCall {
   timestamp: string;
 }
 
+export interface CallHistoryEntry {
+  id: string;
+  type: 'video' | 'audio';
+  fromUserId: string;
+  toUserId: string;
+  fromUserName: string;
+  toUserName: string;
+  startTime: Date;
+  endTime: Date;
+  duration: number;
+  status: 'completed' | 'missed' | 'declined' | 'failed';
+  connectionQuality: 'excellent' | 'good' | 'fair' | 'poor';
+}
+
 export interface CallSignalingState {
   call: Call | null;
   localStream: MediaStream | null;
@@ -17,6 +31,9 @@ export interface CallSignalingState {
   isHandlingCallEnd: boolean;
   incomingCall: IncomingCall | null;
   callState: CallState;
+  callHistory: CallHistoryEntry[];
+  connectionQuality: 'excellent' | 'good' | 'fair' | 'poor';
+  isReconnecting: boolean;
 }
 
 export const useCallSignaling = (userId: string, userName: string) => {
@@ -26,7 +43,10 @@ export const useCallSignaling = (userId: string, userName: string) => {
     remoteStream: null,
     isHandlingCallEnd: false,
     incomingCall: null,
-    callState: webRTCService.getCallState()
+    callState: webRTCService.getCallState(),
+    callHistory: [],
+    connectionQuality: 'poor',
+    isReconnecting: false
   });
 
   const callEndTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -43,20 +63,38 @@ export const useCallSignaling = (userId: string, userName: string) => {
         ...prev,
         callState,
         localStream: callState.localStream,
-        remoteStream: callState.remoteStream
+        remoteStream: callState.remoteStream,
+        connectionQuality: callState.connectionQuality,
+        isReconnecting: callState.connectionStatus === 'reconnecting'
       }));
     };
 
     const handleCallEnded = (data: { callId: string; duration: number; callType: 'video' | 'audio' }) => {
+      // Add to call history
+      const callHistoryEntry: CallHistoryEntry = {
+        id: data.callId,
+        type: data.callType,
+        fromUserId: state.call?.fromUserId || '',
+        toUserId: state.call?.toUserId || '',
+        fromUserName: state.call?.fromUserId === userId ? userName : 'Unknown',
+        toUserName: state.call?.toUserId === userId ? userName : 'Unknown',
+        startTime: state.call?.startTime || new Date(),
+        endTime: new Date(),
+        duration: data.duration,
+        status: 'completed',
+        connectionQuality: state.connectionQuality
+      };
+
       setState(prev => ({
         ...prev,
         call: null,
         localStream: null,
         remoteStream: null,
-        isHandlingCallEnd: false
+        isHandlingCallEnd: false,
+        callHistory: [...prev.callHistory, callHistoryEntry]
       }));
 
-      // Generate call history message
+      // Generate call history message for chat
       const callHistoryMessage = {
         type: 'call_history',
         callId: data.callId,
@@ -66,7 +104,7 @@ export const useCallSignaling = (userId: string, userName: string) => {
       };
 
       // Send call history via WebSocket
-      webSocketService.send('call_history', callHistoryMessage);
+      webSocketService.sendMessage('call_history', callHistoryMessage);
     };
 
     const handleConnectionFailed = () => {
@@ -166,7 +204,7 @@ export const useCallSignaling = (userId: string, userName: string) => {
       callType: 'video' | 'audio';
     }) => {
       console.log('📞 Call initiated, sending offer:', data);
-      webSocketService.send('call_offer', {
+      webSocketService.sendMessage('call_offer', {
         callId: data.callId,
         toUserId: data.toUserId,
         fromUserId: userId,
@@ -174,7 +212,7 @@ export const useCallSignaling = (userId: string, userName: string) => {
         offer: data.offer,
         callType: data.callType,
         timestamp: new Date().toISOString()
-      });
+      }, data.toUserId);
     };
 
     const handleCallAccepted = (data: {
@@ -183,12 +221,12 @@ export const useCallSignaling = (userId: string, userName: string) => {
       answer: RTCSessionDescriptionInit;
     }) => {
       console.log('📞 Call accepted, sending answer:', data);
-      webSocketService.send('call_answer', {
+      webSocketService.sendMessage('call_answer', {
         callId: data.callId,
         toUserId: data.fromUserId,
         fromUserId: userId,
         answer: data.answer
-      });
+      }, data.fromUserId);
     };
 
     const handleCallRejected = (data: {
@@ -196,11 +234,11 @@ export const useCallSignaling = (userId: string, userName: string) => {
       fromUserId: string;
     }) => {
       console.log('📞 Call rejected, notifying remote user:', data);
-      webSocketService.send('call_reject', {
+      webSocketService.sendMessage('call_reject', {
         callId: data.callId,
         toUserId: data.fromUserId,
         fromUserId: userId
-      });
+      }, data.fromUserId);
     };
 
     const handleIceCandidateEmit = (data: {
@@ -208,11 +246,11 @@ export const useCallSignaling = (userId: string, userName: string) => {
       toUserId: string;
     }) => {
       console.log('🧊 Sending ICE candidate:', data);
-      webSocketService.send('ice_candidate', {
+      webSocketService.sendMessage('ice_candidate', {
         toUserId: data.toUserId,
         fromUserId: userId,
         candidate: data.candidate
-      });
+      }, data.toUserId);
     };
 
     const handleCallEndedEmit = (data: {
@@ -222,11 +260,11 @@ export const useCallSignaling = (userId: string, userName: string) => {
     }) => {
       console.log('📞 Call ended, notifying remote user:', data);
       if (state.call) {
-        webSocketService.send('call_end', {
+        webSocketService.sendMessage('call_end', {
           callId: data.callId,
           toUserId: state.call.toUserId,
           fromUserId: userId
-        });
+        }, state.call.toUserId);
       }
     };
 
@@ -241,6 +279,7 @@ export const useCallSignaling = (userId: string, userName: string) => {
     webSocketService.on('call_offer', handleCallOffer);
     webSocketService.on('call_answer', handleCallAnswer);
     webSocketService.on('call_reject', handleCallReject);
+    webSocketService.on('call_rejected', handleCallReject); // Handle call_rejected from server
     webSocketService.on('call_end', handleCallEnd);
     webSocketService.on('ice_candidate', handleIceCandidate);
 
@@ -256,6 +295,7 @@ export const useCallSignaling = (userId: string, userName: string) => {
       webSocketService.off('call_offer', handleCallOffer);
       webSocketService.off('call_answer', handleCallAnswer);
       webSocketService.off('call_reject', handleCallReject);
+      webSocketService.off('call_rejected', handleCallReject); // Cleanup call_rejected listener
       webSocketService.off('call_end', handleCallEnd);
       webSocketService.off('ice_candidate', handleIceCandidate);
     };
@@ -355,16 +395,50 @@ export const useCallSignaling = (userId: string, userName: string) => {
   const rejectCall = useCallback(() => {
     if (!state.incomingCall) return;
 
-    webRTCService.rejectCall(state.incomingCall.callId, state.incomingCall.fromUserId);
-    
-    setState(prev => ({ 
-      ...prev, 
-      incomingCall: null 
+    // Add to call history for rejected calls
+    const callHistoryEntry: CallHistoryEntry = {
+      id: state.incomingCall.callId,
+      type: state.incomingCall.callType,
+      fromUserId: state.incomingCall.fromUserId,
+      toUserId: userId,
+      fromUserName: state.incomingCall.fromUserName,
+      toUserName: userName,
+      startTime: new Date(),
+      endTime: new Date(),
+      duration: 0,
+      status: 'declined',
+      connectionQuality: 'poor'
+    };
+
+    setState(prev => ({
+      ...prev,
+      incomingCall: null,
+      callHistory: [...prev.callHistory, callHistoryEntry]
     }));
+
+    // Generate call history message for chat
+    const callHistoryMessage = {
+      type: 'call_history',
+      chatId: `chat_${state.incomingCall.fromUserId}_${userId}`,
+      content: `Call declined`,
+      callData: {
+        callId: state.incomingCall.callId,
+        duration: 0,
+        callType: state.incomingCall.callType,
+        status: 'declined',
+        participants: [state.incomingCall.fromUserId, userId]
+      }
+    };
+
+    // Send call history via WebSocket
+    webSocketService.sendMessage('call_history', callHistoryMessage);
+
+    // Let WebRTC service handle the reject message sending
+    webRTCService.rejectCall(state.incomingCall.callId, state.incomingCall.fromUserId);
 
     // Clear pending offer
     delete (window as any).pendingCallOffer;
-  }, [state.incomingCall]);
+  }, [state.incomingCall, userId, userName]);
 
   const endCall = useCallback(() => {
     if (state.isHandlingCallEnd) return;
@@ -419,6 +493,19 @@ export const useCallSignaling = (userId: string, userName: string) => {
     };
   }, []);
 
+  // Get call history
+  const getCallHistory = useCallback(() => {
+    return state.callHistory;
+  }, [state.callHistory]);
+
+  // Clear call history
+  const clearCallHistory = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      callHistory: []
+    }));
+  }, []);
+
   return {
     // State
     call: state.call,
@@ -427,6 +514,9 @@ export const useCallSignaling = (userId: string, userName: string) => {
     isHandlingCallEnd: state.isHandlingCallEnd,
     incomingCall: state.incomingCall,
     callState: state.callState,
+    callHistory: state.callHistory,
+    connectionQuality: state.connectionQuality,
+    isReconnecting: state.isReconnecting,
 
     // Actions
     initiateCall,
@@ -436,6 +526,8 @@ export const useCallSignaling = (userId: string, userName: string) => {
     toggleAudio,
     toggleVideo,
     startScreenShare,
-    stopScreenShare
+    stopScreenShare,
+    getCallHistory,
+    clearCallHistory
   };
 };

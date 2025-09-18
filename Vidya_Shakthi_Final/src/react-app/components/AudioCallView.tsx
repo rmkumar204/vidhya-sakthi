@@ -1,36 +1,39 @@
 import React, { useRef, useEffect, useState } from 'react';
-import {
-  PhoneIcon,
-  MicrophoneIcon,
-  SpeakerXMarkIcon,
-  SpeakerWaveIcon
-} from '@heroicons/react/24/outline';
+import { Call, User } from '../types';
 
 interface AudioCallViewProps {
+  call: Call;
+  user: User;
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
   isAudioEnabled: boolean;
+  connectionQuality: 'excellent' | 'good' | 'fair' | 'poor';
   callDuration: number;
-  connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'failed';
   onToggleAudio: () => void;
   onEndCall: () => void;
-  remoteUserName?: string;
 }
 
-const AudioCallView: React.FC<AudioCallViewProps> = ({
+export const AudioCallView: React.FC<AudioCallViewProps> = ({
+  call,
   localStream,
   remoteStream,
   isAudioEnabled,
+  connectionQuality,
   callDuration,
-  connectionStatus,
   onToggleAudio,
-  onEndCall,
-  remoteUserName = 'Remote User'
+  onEndCall
 }) => {
-  const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const localAudioRef = useRef<HTMLAudioElement>(null);
-  const [isSpeakerOn, setIsSpeakerOn] = useState(true);
-  const [localVolume, setLocalVolume] = useState(0);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
+  const [audioLevel, setAudioLevel] = useState(0);
+
+  // Setup local audio stream (for monitoring)
+  useEffect(() => {
+    if (localAudioRef.current && localStream) {
+      localAudioRef.current.srcObject = localStream;
+      localAudioRef.current.volume = 0.1; // Low volume for monitoring
+    }
+  }, [localStream]);
 
   // Setup remote audio stream
   useEffect(() => {
@@ -39,14 +42,7 @@ const AudioCallView: React.FC<AudioCallViewProps> = ({
     }
   }, [remoteStream]);
 
-  // Setup local audio stream for monitoring
-  useEffect(() => {
-    if (localAudioRef.current && localStream) {
-      localAudioRef.current.srcObject = localStream;
-    }
-  }, [localStream]);
-
-  // Monitor local audio volume
+  // Monitor audio levels for visual feedback
   useEffect(() => {
     if (!localStream) return;
 
@@ -60,224 +56,166 @@ const AudioCallView: React.FC<AudioCallViewProps> = ({
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
     
-    const updateVolume = () => {
+    const updateAudioLevel = () => {
       analyser.getByteFrequencyData(dataArray);
       const average = dataArray.reduce((a, b) => a + b) / bufferLength;
-      setLocalVolume(average);
-      requestAnimationFrame(updateVolume);
+      setAudioLevel(average / 255);
+      requestAnimationFrame(updateAudioLevel);
     };
     
-    updateVolume();
-
+    updateAudioLevel();
+    
     return () => {
       audioContext.close();
     };
   }, [localStream]);
 
   // Format call duration
-  const formatDuration = (seconds: number): string => {
+  const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-
+    
     if (hours > 0) {
-      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
-    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Get connection status color
-  const getConnectionStatusColor = () => {
-    switch (connectionStatus) {
-      case 'connected':
-        return 'text-green-500';
-      case 'connecting':
-        return 'text-yellow-500';
-      case 'failed':
-        return 'text-red-500';
-      default:
-        return 'text-gray-500';
+  // Get connection quality color
+  const getQualityColor = (quality: string) => {
+    switch (quality) {
+      case 'excellent': return 'text-green-500';
+      case 'good': return 'text-blue-500';
+      case 'fair': return 'text-yellow-500';
+      case 'poor': return 'text-red-500';
+      default: return 'text-gray-500';
     }
   };
 
-  // Get volume bar height
-  const getVolumeBarHeight = (volume: number) => {
-    return Math.max(4, (volume / 255) * 100);
+  // Get connection quality indicator
+  const getQualityIndicator = (quality: string) => {
+    switch (quality) {
+      case 'excellent': return '🟢';
+      case 'good': return '🔵';
+      case 'fair': return '🟡';
+      case 'poor': return '🔴';
+      default: return '⚪';
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 z-50 flex flex-col">
-      {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/30 to-transparent p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className={`w-3 h-3 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' : connectionStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
-            <div>
-              <h2 className="text-white text-xl font-semibold">Audio Call</h2>
-              <p className={`text-sm ${getConnectionStatusColor()}`}>
-                {connectionStatus === 'connected' ? 'Connected' : 
-                 connectionStatus === 'connecting' ? 'Connecting...' : 
-                 connectionStatus === 'failed' ? 'Connection Failed' : 'Disconnected'}
-              </p>
+    <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex flex-col items-center justify-center z-50">
+      {/* Header with call info and connection status */}
+      <div className="absolute top-0 left-0 right-0 bg-black bg-opacity-30 text-white p-4 z-10">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">{getQualityIndicator(connectionQuality)}</span>
+              <span className={`text-sm ${getQualityColor(connectionQuality)}`}>
+                {connectionQuality.toUpperCase()}
+              </span>
+            </div>
+            <div className="text-sm">
+              {formatDuration(callDuration)}
             </div>
           </div>
-          <div className="text-white text-lg font-mono">
-            {formatDuration(callDuration)}
+          <div className="text-right">
+            <div className="text-lg font-semibold">
+              {call.to?.name || call.from?.name || 'Unknown User'}
+            </div>
+            <div className="text-sm text-gray-300">
+              Audio Call
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          {/* Remote User Avatar */}
-          <div className="relative mb-8">
-            <div className="w-48 h-48 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto shadow-2xl">
-              <span className="text-8xl text-white">👤</span>
-            </div>
-            
-            {/* Connection Status Ring */}
-            <div className={`absolute inset-0 rounded-full border-4 ${
-              connectionStatus === 'connected' ? 'border-green-500' : 
-              connectionStatus === 'connecting' ? 'border-yellow-500 animate-pulse' : 
-              'border-red-500'
-            }`}></div>
-            
-            {/* Audio Level Indicator */}
-            {connectionStatus === 'connected' && (
-              <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
-                <div className="flex space-x-1">
-                  {[1, 2, 3, 4, 5].map((bar) => (
-                    <div
-                      key={bar}
-                      className="w-1 bg-green-400 rounded-full animate-pulse"
-                      style={{
-                        height: `${Math.random() * 20 + 10}px`,
-                        animationDelay: `${bar * 0.1}s`
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+      {/* Main content area */}
+      <div className="flex flex-col items-center justify-center space-y-8">
+        {/* User avatar with audio level indicator */}
+        <div className="relative">
+          <div className="w-48 h-48 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center shadow-2xl">
+            <span className="text-6xl font-bold text-white">
+              {(call.to?.name || call.from?.name || 'U').charAt(0).toUpperCase()}
+            </span>
           </div>
-
-          {/* Remote User Name */}
-          <h1 className="text-3xl font-bold text-white mb-2">{remoteUserName}</h1>
-          <p className="text-blue-200 text-lg">Audio Call</p>
-
-          {/* Local Audio Monitor */}
-          {localStream && (
-            <div className="mt-8 flex justify-center">
-              <div className="flex items-center space-x-2 bg-black/30 rounded-full px-4 py-2">
-                <div className="flex space-x-1">
-                  {[1, 2, 3, 4, 5].map((bar) => (
-                    <div
-                      key={bar}
-                      className={`w-1 rounded-full transition-all duration-150 ${
-                        localVolume > (bar * 50) ? 'bg-green-400' : 'bg-gray-600'
-                      }`}
-                      style={{
-                        height: `${getVolumeBarHeight(localVolume)}px`
-                      }}
-                    />
-                  ))}
-                </div>
-                <span className="text-white text-sm ml-2">Your Voice</span>
+          
+          {/* Audio level indicator */}
+          {isAudioEnabled && (
+            <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
+              <div className="flex space-x-1">
+                {[...Array(5)].map((_, i) => (
+                  <div
+                    key={i}
+                    className={`w-1 h-4 rounded-full transition-all duration-150 ${
+                      audioLevel > (i + 1) * 0.2 ? 'bg-green-400' : 'bg-gray-400'
+                    }`}
+                  />
+                ))}
               </div>
             </div>
           )}
         </div>
-      </div>
 
-      {/* Control Bar */}
-      <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-8">
-        <div className="flex items-center justify-center space-x-6">
-          {/* Speaker Toggle */}
-          <button
-            onClick={() => setIsSpeakerOn(!isSpeakerOn)}
-            className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors ${
-              isSpeakerOn 
-                ? 'bg-gray-600 hover:bg-gray-500 text-white' 
-                : 'bg-red-500 hover:bg-red-600 text-white'
-            }`}
-            title={isSpeakerOn ? 'Mute speaker' : 'Unmute speaker'}
-          >
-            {isSpeakerOn ? (
-              <SpeakerWaveIcon className="w-7 h-7" />
-            ) : (
-              <SpeakerXMarkIcon className="w-7 h-7" />
-            )}
-          </button>
-
-          {/* Audio Toggle */}
-          <button
-            onClick={onToggleAudio}
-            className={`w-16 h-16 rounded-full flex items-center justify-center transition-colors ${
-              isAudioEnabled 
-                ? 'bg-gray-600 hover:bg-gray-500 text-white' 
-                : 'bg-red-500 hover:bg-red-600 text-white'
-            }`}
-            title={isAudioEnabled ? 'Mute microphone' : 'Unmute microphone'}
-          >
-            {isAudioEnabled ? (
-              <MicrophoneIcon className="w-8 h-8" />
-            ) : (
-              <SpeakerXMarkIcon className="w-8 h-8" />
-            )}
-          </button>
-
-          {/* End Call */}
-          <button
-            onClick={onEndCall}
-            className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-colors"
-            title="End call"
-          >
-            <PhoneIcon className="w-8 h-8 rotate-45" />
-          </button>
+        {/* User info */}
+        <div className="text-center text-white">
+          <h2 className="text-3xl font-semibold mb-2">
+            {call.to?.name || call.from?.name || 'Unknown User'}
+          </h2>
+          <div className="flex items-center justify-center space-x-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <span className="text-gray-300 text-sm">Online</span>
+          </div>
         </div>
 
-        {/* Audio Quality Indicator */}
-        <div className="flex justify-center mt-6">
-          <div className="flex items-center space-x-2 bg-black/30 rounded-full px-4 py-2">
-            <div className="flex space-x-1">
-              {[1, 2, 3, 4, 5].map((bar) => (
-                <div
-                  key={bar}
-                  className={`w-1 h-4 rounded-full ${
-                    connectionStatus === 'connected' && bar <= 4
-                      ? 'bg-green-500'
-                      : connectionStatus === 'connecting' && bar <= 2
-                      ? 'bg-yellow-500'
-                      : 'bg-gray-500'
-                  }`}
-                />
-              ))}
-            </div>
-            <span className="text-white text-sm ml-2">Audio Quality</span>
+        {/* Audio status */}
+        <div className="text-center text-white">
+          <div className="text-sm text-gray-300 mb-2">Audio Status</div>
+          <div className={`text-lg font-semibold ${isAudioEnabled ? 'text-green-400' : 'text-red-400'}`}>
+            {isAudioEnabled ? 'Connected' : 'Muted'}
           </div>
         </div>
       </div>
 
-      {/* Hidden Audio Elements */}
-      {remoteStream && (
-        <audio
-          ref={remoteAudioRef}
-          autoPlay
-          playsInline
-          className="hidden"
-        />
-      )}
-      
-      {localStream && (
-        <audio
-          ref={localAudioRef}
-          autoPlay
-          playsInline
-          muted={true}
-          className="hidden"
-        />
-      )}
+      {/* Audio elements (hidden) */}
+      <audio ref={localAudioRef} autoPlay muted />
+      <audio ref={remoteAudioRef} autoPlay />
+
+      {/* Control bar */}
+      <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-75 text-white p-6">
+        <div className="flex justify-center items-center space-x-6">
+          {/* Audio toggle */}
+          <button
+            onClick={onToggleAudio}
+            className={`p-4 rounded-full transition-colors ${
+              isAudioEnabled 
+                ? 'bg-gray-600 hover:bg-gray-700' 
+                : 'bg-red-500 hover:bg-red-600'
+            }`}
+            title={isAudioEnabled ? 'Mute' : 'Unmute'}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {isAudioEnabled ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+              )}
+            </svg>
+          </button>
+
+          {/* End call */}
+          <button
+            onClick={onEndCall}
+            className="p-4 rounded-full bg-red-500 hover:bg-red-600 transition-colors"
+            title="End call"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

@@ -13,7 +13,7 @@ export interface Message {
   senderId: string;
   content: string;
   timestamp: string;
-  type: 'text' | 'voice' | 'image' | 'file';
+  type: 'text' | 'voice' | 'image' | 'file' | 'call_history';
   isRead: boolean;
   isDelivered: boolean;
 }
@@ -48,11 +48,13 @@ export interface Call {
   startTime?: Date;
   endTime?: Date;
   duration?: number;
+  participants: string[]; // Array of user IDs participating in the call
 }
 
 export enum CallStatus {
   IDLE = 'idle',
   RINGING = 'ringing',
   ACTIVE = 'active',
+  REJECTED = 'rejected',
   ENDED = 'ended'
 }

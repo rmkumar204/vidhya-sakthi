@@ -226,7 +226,7 @@ class MessagingService {
 
   sendTypingIndicator(chatId: string, isTyping: boolean): void {
     if (this.isOnline && webSocketService.isConnected()) {
-      webSocketService.sendTyping(chatId, isTyping);
+      webSocketService.sendTypingIndicator(chatId, isTyping);
     }
 
     // Clear existing timeout
@@ -239,7 +239,7 @@ class MessagingService {
     if (isTyping) {
       const timeout = setTimeout(() => {
         if (this.isOnline && webSocketService.isConnected()) {
-          webSocketService.sendTyping(chatId, false);
+          webSocketService.sendTypingIndicator(chatId, false);
         }
         this.typingTimeouts.delete(chatId);
       }, 3000);

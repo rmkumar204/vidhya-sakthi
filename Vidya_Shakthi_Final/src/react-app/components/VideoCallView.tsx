@@ -1,263 +1,375 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { Call, User } from '../types';
+import React, { useEffect, useRef, useState } from 'react';
+import { User } from '../types';
+import { MicIcon, VideoCameraIcon, PhoneIcon } from './Icons';
+import { webRTCService } from '../services/WebRTCService';
+import { webSocketService } from '../services/WebSocketService';
 
 interface VideoCallViewProps {
-  call: Call;
   user: User;
-  localStream: MediaStream | null;
-  remoteStream: MediaStream | null;
-  isAudioEnabled: boolean;
-  isVideoEnabled: boolean;
-  isScreenSharing: boolean;
-  connectionQuality: 'excellent' | 'good' | 'fair' | 'poor';
-  callDuration: number;
-  onToggleAudio: () => void;
-  onToggleVideo: () => void;
-  onToggleScreenShare: () => void;
+  otherUser: User;
   onEndCall: () => void;
 }
 
-export const VideoCallView: React.FC<VideoCallViewProps> = ({
-  call,
-  user,
-  localStream,
-  remoteStream,
-  isAudioEnabled,
-  isVideoEnabled,
-  isScreenSharing,
-  connectionQuality,
-  callDuration,
-  onToggleAudio,
-  onToggleVideo,
-  onToggleScreenShare,
-  onEndCall
-}) => {
+const VideoCallView: React.FC<VideoCallViewProps> = ({ user, otherUser, onEndCall }) => {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const localAudioRef = useRef<HTMLAudioElement>(null);
-  const remoteAudioRef = useRef<HTMLAudioElement>(null);
-  const [isLocalVideoMuted] = useState(false);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null); // Separate audio element for better control
+  const localAudioRef = useRef<HTMLAudioElement>(null); // Local audio monitoring
+  const [isMuted, setIsMuted] = useState(false);
+  const [remoteMuted, setRemoteMuted] = useState(false);
+  const [isVideoOff, setIsVideoOff] = useState(false);
+  const [remoteVideoOff, setRemoteVideoOff] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState('Connecting...');
+  const [callDuration, setCallDuration] = useState(0);
+  const [localAudioEnabled, setLocalAudioEnabled] = useState(true); // Voice monitoring enabled
 
-  // Setup local video stream
   useEffect(() => {
-    if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
-    }
-  }, [localStream]);
+    const setupCall = async () => {
+      try {
+        setConnectionStatus('Starting media...');
+        
+        // Get local stream from WebRTC service
+        const localStream = webRTCService.getLocalStream();
+        if (localStream && localVideoRef.current) {
+          localVideoRef.current.srcObject = localStream;
+          console.log('📹 VideoCallView: Local video stream set');
+        }
+        
+        // Setup local audio monitoring for voice feedback
+        const setupLocalAudio = () => {
+          const localStream = webRTCService.getLocalStream();
+          if (localStream && localAudioRef.current) {
+            localAudioRef.current.srcObject = localStream;
+            localAudioRef.current.volume = 0.3; // Lower volume to avoid feedback
+            localAudioRef.current.muted = isMuted; // Respect mute state
+            console.log('🎤 VideoCallView: Local audio monitoring setup complete');
+          }
+        };
+        
+        setupLocalAudio();
+        
+        // Retry local audio setup after delay if needed
+        setTimeout(setupLocalAudio, 1000);
+        
+        // Setup remote stream handler with separate audio handling
+        webRTCService.onRemoteStream((stream) => {
+          console.log('📹 VideoCallView: Remote stream received:', {
+            audioTracks: stream.getAudioTracks().length,
+            videoTracks: stream.getVideoTracks().length
+          });
+          
+          // Set video stream
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = stream;
+            console.log('📹 Remote video stream set');
+          }
+          
+          // Set audio stream separately for better control
+          if (remoteAudioRef.current) {
+            remoteAudioRef.current.srcObject = stream;
+            remoteAudioRef.current.volume = 1.0; // Full volume for remote audio
+            // Ensure audio plays even if autoplay is blocked
+            remoteAudioRef.current.play().catch(e => {
+              console.warn('⚠️ Remote audio autoplay blocked, user interaction required:', e);
+            });
+            console.log('🔊 Remote audio stream set with volume:', remoteAudioRef.current.volume);
+          }
+          
+          setIsConnected(true);
+          setConnectionStatus('Connected');
+          
+          // Check if remote stream has video tracks
+          const videoTracks = stream.getVideoTracks();
+          const hasVideo = videoTracks.length > 0 && videoTracks[0].enabled;
+          setRemoteVideoOff(!hasVideo);
+          console.log('📹 Remote video status:', { hasVideo, trackCount: videoTracks.length });
+        });
+        
+        // Setup call end handler
+        webRTCService.onCallEnd(() => {
+          console.log('📞 VideoCallView: Call ended by WebRTC service');
+          onEndCall();
+        });
+        
+        // Setup mute status listener
+        const handleMuteStatus = (data: { isMuted: boolean; userId: string }) => {
+          console.log('🎤 Mute status received:', data);
+          if (data.userId !== user.id) {
+            setRemoteMuted(data.isMuted);
+          }
+        };
+        
+        // Setup video status listener
+        const handleVideoStatus = (data: { videoEnabled: boolean; userId: string }) => {
+          console.log('📹 Video status received:', data);
+          if (data.userId !== user.id) {
+            setRemoteVideoOff(!data.videoEnabled);
+          }
+        };
+        
+        webSocketService.on('call_mute_status', handleMuteStatus);
+        webSocketService.on('call_video_status', handleVideoStatus);
+        
+        setConnectionStatus('Connecting to peer...');
+        
+        return () => {
+          webSocketService.off('call_mute_status', handleMuteStatus);
+          webSocketService.off('call_video_status', handleVideoStatus);
+        };
+      } catch (err) {
+        console.error('❌ Error setting up video call:', err);
+        setConnectionStatus('Connection failed');
+        setTimeout(() => onEndCall(), 3000);
+      }
+    };
 
-  // Setup remote video stream
+    setupCall();
+
+    return () => {
+      // Cleanup is handled by the WebRTC service
+    };
+  }, [onEndCall, user.id]);
+
+  // Call duration timer
   useEffect(() => {
-    if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
+    let interval: NodeJS.Timeout;
+    if (isConnected) {
+      interval = setInterval(() => {
+        setCallDuration(prev => prev + 1);
+      }, 1000);
     }
-  }, [remoteStream]);
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isConnected]);
 
-  // Setup local audio stream (for monitoring)
-  useEffect(() => {
-    if (localAudioRef.current && localStream) {
-      localAudioRef.current.srcObject = localStream;
-      localAudioRef.current.volume = 0.1; // Low volume for monitoring
-    }
-  }, [localStream]);
-
-  // Setup remote audio stream
-  useEffect(() => {
-    if (remoteAudioRef.current && remoteStream) {
-      remoteAudioRef.current.srcObject = remoteStream;
-    }
-  }, [remoteStream]);
-
-  // Format call duration
   const formatDuration = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
+    const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const toggleMute = () => {
+    const newMutedState = !isMuted;
+    console.log('🎤 VideoCallView: Toggling mute from', isMuted, 'to', newMutedState);
     
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    webRTCService.toggleAudio(!newMutedState);
+    setIsMuted(newMutedState);
+    
+    // Update local audio monitoring
+    if (localAudioRef.current) {
+      localAudioRef.current.muted = newMutedState;
+      console.log('🎤 Local audio monitoring muted:', newMutedState);
     }
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    
+    // Send mute status to other user
+    if (webSocketService.isConnected()) {
+      webSocketService.sendMuteStatus(otherUser.id, newMutedState, user.id);
+      console.log('📡 Sent mute status to', otherUser.name, ':', newMutedState);
+    }
+  };
+  
+  const toggleVideo = () => {
+    const newVideoState = !isVideoOff;
+    console.log('📹 VideoCallView: Toggling video from', isVideoOff, 'to', newVideoState);
+    
+    webRTCService.toggleVideo(!newVideoState);
+    setIsVideoOff(newVideoState);
+    
+    // Send video status to other user
+    if (webSocketService.isConnected()) {
+      webSocketService.sendVideoStatus(otherUser.id, newVideoState, user.id);
+      console.log('📡 Sent video status to', otherUser.name, ':', !newVideoState);
+    }
   };
 
-  // Get connection quality color
-  const getQualityColor = (quality: string) => {
-    switch (quality) {
-      case 'excellent': return 'text-green-500';
-      case 'good': return 'text-blue-500';
-      case 'fair': return 'text-yellow-500';
-      case 'poor': return 'text-red-500';
-      default: return 'text-gray-500';
+  const toggleLocalAudioMonitoring = () => {
+    const newState = !localAudioEnabled;
+    setLocalAudioEnabled(newState);
+    
+    if (localAudioRef.current) {
+      localAudioRef.current.muted = !newState || isMuted;
+      localAudioRef.current.volume = newState ? 0.3 : 0;
     }
+    
+    console.log('🔊 VideoCallView: Local audio monitoring updated:', { 
+      localAudioEnabled: newState, 
+      isMuted, 
+      volume: localAudioRef.current?.volume
+    });
   };
 
-  // Get connection quality indicator
-  const getQualityIndicator = (quality: string) => {
-    switch (quality) {
-      case 'excellent': return '🟢';
-      case 'good': return '🔵';
-      case 'fair': return '🟡';
-      case 'poor': return '🔴';
-      default: return '⚪';
-    }
+  const handleEndCall = () => {
+    console.log('📞 VideoCallView: Ending call manually');
+    webRTCService.endCall();
+    onEndCall();
   };
 
   return (
-    <div className="fixed inset-0 bg-black flex flex-col z-50">
-      {/* Header with call info and connection status */}
-      <div className="absolute top-0 left-0 right-0 bg-black bg-opacity-50 text-white p-4 z-10">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <span className="text-lg">{getQualityIndicator(connectionQuality)}</span>
-              <span className={`text-sm ${getQualityColor(connectionQuality)}`}>
-                {connectionQuality.toUpperCase()}
-              </span>
-            </div>
-            <div className="text-sm">
-              {formatDuration(callDuration)}
-            </div>
+    <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex flex-col items-center justify-center text-white">
+      {/* Remote Audio - Separate element for better audio control */}
+      <audio ref={remoteAudioRef} autoPlay playsInline />
+      
+      {/* Local Audio Monitoring for voice feedback */}
+      <audio 
+        ref={localAudioRef} 
+        autoPlay 
+        playsInline
+        muted={!localAudioEnabled || isMuted}
+        volume={localAudioEnabled ? 0.3 : 0}
+      />
+      
+      {/* Remote Video */}
+      <div className="relative w-full h-full flex items-center justify-center">
+        {isConnected && !remoteVideoOff ? (
+          <video 
+            ref={remoteVideoRef} 
+            autoPlay 
+            playsInline 
+            className="w-full h-full object-cover"
+          />
+        ) : isConnected && remoteVideoOff ? (
+          <div className="flex flex-col items-center text-center bg-slate-800 p-8 rounded-lg shadow-2xl">
+            <img 
+              src={otherUser.avatarUrl} 
+              alt={otherUser.name} 
+              className="w-40 h-40 rounded-full mb-4 border-4 border-slate-600"
+            />
+            <h2 className="text-3xl font-bold">{otherUser.name}</h2>
+            <p className="text-slate-400 mt-2">Camera is off</p>
+            {remoteMuted && (
+              <p className="text-red-400 mt-1 flex items-center gap-1">
+                <MicIcon className="w-4 h-4" /> Microphone muted
+              </p>
+            )}
+            <p className="text-green-400 text-lg font-mono mt-2">{formatDuration(callDuration)}</p>
           </div>
-          <div className="text-right">
-            <div className="text-lg font-semibold">
-              {call.to?.name || call.from?.name || 'Unknown User'}
-            </div>
-            <div className="text-sm text-gray-300">
-              {isScreenSharing ? 'Screen Sharing' : 'Video Call'}
-            </div>
+        ) : (
+          <div className="flex flex-col items-center text-center bg-slate-800 p-8 rounded-lg">
+            <img 
+              src={otherUser.avatarUrl} 
+              alt={otherUser.name} 
+              className="w-32 h-32 rounded-full mb-4 border-4 border-slate-600 animate-pulse"
+            />
+            <h2 className="text-3xl font-bold">{otherUser.name}</h2>
+            <p className="text-slate-400 mt-2">{connectionStatus}</p>
           </div>
-        </div>
+        )}
+        
+        {/* Call Duration Overlay */}
+        {isConnected && !remoteVideoOff && (
+          <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-sm px-3 py-1 rounded-full">
+            <span className="text-white font-mono text-sm">{formatDuration(callDuration)}</span>
+          </div>
+        )}
+        
+        {/* Remote User Mute Indicator */}
+        {isConnected && !remoteVideoOff && remoteMuted && (
+          <div className="absolute top-4 right-4 bg-red-500/80 backdrop-blur-sm px-3 py-1 rounded-full flex items-center gap-2">
+            <MicIcon className="w-4 h-4" />
+            <span className="text-white text-sm">{otherUser.name} muted</span>
+          </div>
+        )}
+        
+        {/* Local User Voice Monitoring Indicator */}
+        {isConnected && (localAudioEnabled || isMuted) && (
+          <div className="absolute top-4 left-4 bg-slate-800/80 backdrop-blur-sm px-3 py-1 rounded-full flex items-center gap-2">
+            {localAudioEnabled && (
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="text-white text-xs">Voice Monitor</span>
+              </div>
+            )}
+            {isMuted && (
+              <div className="flex items-center gap-1">
+                <MicIcon className="w-3 h-3 text-red-400" />
+                <span className="text-red-400 text-xs">Muted</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Main video area */}
-      <div className="flex-1 relative">
-        {/* Remote video (full screen) */}
-        <div className="absolute inset-0">
-          {remoteStream && !isLocalVideoMuted ? (
-            <video
-              ref={remoteVideoRef}
-              autoPlay
-              playsInline
-              muted={false}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-purple-900 to-blue-900 flex items-center justify-center">
-              <div className="text-center text-white">
-                <div className="w-32 h-32 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center shadow-2xl mx-auto mb-6">
-                  <span className="text-4xl font-bold">
-                    {(call.to?.name || call.from?.name || 'U').charAt(0).toUpperCase()}
-                  </span>
-                </div>
-                <h2 className="text-2xl font-semibold mb-2">
-                  {call.to?.name || call.from?.name || 'Unknown User'}
-                </h2>
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-gray-400 text-sm">Online</span>
-                </div>
-              </div>
+      {/* Local Video Preview */}
+      {!isVideoOff ? (
+        <video 
+          ref={localVideoRef} 
+          autoPlay 
+          playsInline 
+          muted 
+          className="absolute bottom-5 right-5 w-64 h-48 rounded-lg object-cover border-2 border-slate-500"
+        />
+      ) : (
+        <div className="absolute bottom-5 right-5 w-64 h-48 rounded-lg bg-slate-800 border-2 border-slate-500 flex items-center justify-center">
+          <div className="text-center">
+            <img src={user.avatarUrl} alt={user.name} className="w-16 h-16 rounded-full mx-auto mb-2"/>
+            <p className="text-sm text-slate-400">Camera Off</p>
+            {isMuted && (
+              <p className="text-red-400 text-xs mt-1 flex items-center justify-center gap-1">
+                <MicIcon className="w-3 h-3" /> Muted
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+      
+      {/* Controls */}
+      <div className="absolute bottom-10 flex items-center gap-4 bg-slate-800/50 backdrop-blur-sm p-4 rounded-full">
+        {/* Mute Button */}
+        <div className="relative">
+          <button 
+            onClick={toggleMute} 
+            className={`p-4 rounded-full transition-colors ${
+              isMuted ? 'bg-red-500' : 'bg-slate-600 hover:bg-slate-500'
+            }`}
+            title={isMuted ? 'Unmute microphone' : 'Mute microphone'}
+          >
+            <MicIcon />
+          </button>
+          {isMuted && (
+            <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-red-500 text-white text-xs px-2 py-1 rounded">
+              You're muted
             </div>
           )}
         </div>
-
-        {/* Local video (picture-in-picture) */}
-        <div className="absolute bottom-4 right-4 w-48 h-36 bg-black rounded-lg overflow-hidden shadow-2xl border-2 border-white">
-          {localStream && isVideoEnabled ? (
-            <video
-              ref={localVideoRef}
-              autoPlay
-              playsInline
-              muted={true}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800 flex items-center justify-center">
-              <div className="text-center text-white">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-2">
-                  <span className="text-lg font-bold">
-                    {user.name.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-                <div className="text-xs">
-                  {isVideoEnabled ? 'You' : 'Video Off'}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Audio elements (hidden) */}
-      <audio ref={localAudioRef} autoPlay muted />
-      <audio ref={remoteAudioRef} autoPlay />
-
-      {/* Control bar */}
-      <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-75 text-white p-6">
-        <div className="flex justify-center items-center space-x-6">
-          {/* Audio toggle */}
-          <button
-            onClick={onToggleAudio}
-            className={`p-4 rounded-full transition-colors ${
-              isAudioEnabled 
-                ? 'bg-gray-600 hover:bg-gray-700' 
-                : 'bg-red-500 hover:bg-red-600'
-            }`}
-            title={isAudioEnabled ? 'Mute' : 'Unmute'}
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {isAudioEnabled ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-              )}
-            </svg>
-          </button>
-
-          {/* Video toggle */}
-          <button
-            onClick={onToggleVideo}
-            className={`p-4 rounded-full transition-colors ${
-              isVideoEnabled 
-                ? 'bg-gray-600 hover:bg-gray-700' 
-                : 'bg-red-500 hover:bg-red-600'
-            }`}
-            title={isVideoEnabled ? 'Turn off video' : 'Turn on video'}
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {isVideoEnabled ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              )}
-            </svg>
-          </button>
-
-          {/* Screen share toggle */}
-          <button
-            onClick={onToggleScreenShare}
-            className={`p-4 rounded-full transition-colors ${
-              isScreenSharing 
-                ? 'bg-blue-500 hover:bg-blue-600' 
-                : 'bg-gray-600 hover:bg-gray-700'
-            }`}
-            title={isScreenSharing ? 'Stop sharing' : 'Share screen'}
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-          </button>
-
-          {/* End call */}
-          <button
-            onClick={onEndCall}
-            className="p-4 rounded-full bg-red-500 hover:bg-red-600 transition-colors"
-            title="End call"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+        
+        {/* Voice Monitor Button */}
+        <button 
+          onClick={toggleLocalAudioMonitoring}
+          className={`p-3 rounded-full transition-colors ${
+            localAudioEnabled ? 'bg-green-600 hover:bg-green-500' : 'bg-slate-600 hover:bg-slate-500'
+          }`}
+          title={localAudioEnabled ? 'Disable voice monitoring' : 'Enable voice monitoring'}
+        >
+          <div className="w-4 h-4 relative">
+            <div className={`w-full h-full rounded-full ${
+              localAudioEnabled ? 'bg-white animate-pulse' : 'bg-gray-400'
+            }`}></div>
+          </div>
+        </button>
+        
+        {/* Video Button */}
+        <button 
+          onClick={toggleVideo} 
+          className={`p-4 rounded-full transition-colors ${
+            isVideoOff ? 'bg-red-500' : 'bg-slate-600 hover:bg-slate-500'
+          }`}
+          title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
+        >
+          <VideoCameraIcon />
+        </button>
+        
+        {/* End Call Button */}
+        <button 
+          onClick={handleEndCall} 
+          className="p-4 rounded-full bg-red-600 hover:bg-red-500 transition-colors"
+          title="End call"
+        >
+          <PhoneIcon />
+        </button>
       </div>
     </div>
   );

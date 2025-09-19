@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Call } from '../types';
-import { PhoneIcon, VideoCameraIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { PhoneIcon, XIcon } from './Icons';
 
 interface OutgoingCallModalProps {
   call: Call;
@@ -8,32 +8,66 @@ interface OutgoingCallModalProps {
 }
 
 const OutgoingCallModal: React.FC<OutgoingCallModalProps> = ({ call, onCancel }) => {
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    // Play outgoing call ringtone
+    const playOutgoingTone = () => {
+      if (audioRef.current) {
+        audioRef.current.play().catch(console.error);
+      }
+    };
+
+    playOutgoingTone();
+    
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    };
+  }, []);
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-lg p-8 max-w-md w-full mx-4 text-center">
-        <div className="mb-6">
-          <div className="w-20 h-20 rounded-full bg-slate-600 flex items-center justify-center mx-auto mb-4">
-            <span className="text-white font-bold text-2xl">
-              {call.to.name.charAt(0).toUpperCase()}
-            </span>
+    <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center">
+      <div className="bg-slate-800 rounded-lg shadow-xl p-8 flex flex-col items-center gap-6 border border-slate-600">
+        <img 
+          src={call.to.avatarUrl} 
+          alt={call.to.name} 
+          className="w-32 h-32 rounded-full border-4 border-slate-500 animate-pulse" 
+        />
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-white">{call.to.name}</h2>
+          <p className="text-slate-400">Calling...</p>
+          <div className="flex items-center justify-center mt-3 gap-2">
+            <div className="w-3 h-3 bg-green-400 rounded-full animate-bounce delay-0"></div>
+            <div className="w-3 h-3 bg-green-400 rounded-full animate-bounce delay-75"></div>
+            <div className="w-3 h-3 bg-green-400 rounded-full animate-bounce delay-150"></div>
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2">
-            Calling {call.to.name}
-          </h2>
-          <p className="text-slate-400">
-            {call.type} call in progress...
+        </div>
+        
+        {/* Call Type Indicator */}
+        <div className="text-center">
+          <p className="text-sm text-slate-500 mb-2">
+            {call.type === 'audio' ? '🎤 Audio Call' : '📹 Video Call'}
           </p>
         </div>
 
-        <div className="flex justify-center">
-          <button
-            onClick={onCancel}
-            className="flex items-center justify-center w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors"
+        {/* Cancel Button - Make it more prominent */}
+        <div className="flex gap-4">
+          <button 
+            onClick={onCancel} 
+            className="flex items-center justify-center gap-3 bg-red-600 hover:bg-red-500 text-white font-bold py-4 px-8 rounded-full transition-all duration-200 shadow-lg shadow-red-600/30 min-w-[140px]"
+            title="Cancel Call"
           >
-            <XMarkIcon className="h-8 w-8" />
+            <XIcon /> Cancel
           </button>
         </div>
       </div>
+      
+      {/* Outgoing call ringtone - different from incoming */}
+      <audio ref={audioRef} loop>
+        <source src="data:audio/wav;base64,UklGRqYCAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YYICAAAwMTEyMzM0NDU1NjY3Nzg4OTk6Ojs7PDw9PT4+Pz9AQEFBQkJDQ0REPDw9PT4+Pz9AQEFBQkJDQ0REPDw9PT4+Pz9AQEFBQkJDQ0REAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" type="audio/wav" />
+      </audio>
     </div>
   );
 };

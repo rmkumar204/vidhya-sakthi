@@ -36,6 +36,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
     { name: 'Tasks', href: '/app/tasks', icon: ClipboardDocumentListIcon },
     { name: 'Announcements', href: '/app/announcements', icon: MegaphoneIcon },
     { name: 'Messages', href: '/app/messages', icon: ChatBubbleLeftRightIcon },
+    { name: 'Call History', href: '/app/call-history', icon: PhoneIcon },
     { name: 'Notifications', href: '/app/notifications', icon: BellIcon },
   ];
 

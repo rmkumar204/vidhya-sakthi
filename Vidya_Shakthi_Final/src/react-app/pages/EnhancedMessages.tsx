@@ -11,8 +11,6 @@ import TypingIndicator from '@/react-app/components/TypingIndicator';
 import MessageInput from '@/react-app/components/MessageInput';
 import Avatar from '@/react-app/components/Avatar';
 import { useAuth } from '@/react-app/hooks/useAuth';
-import { useWebRTC } from '@/react-app/hooks/useWebRTC';
-import { useCallSignaling } from '@/react-app/hooks/useCallSignaling';
 // import VideoCallView from '@/react-app/components/VideoCallView'; // Now handled globally by AppWithCalls
 // import AudioCallView from '@/react-app/components/AudioCallView'; // Now handled globally by AppWithCalls
 // import IncomingCallModal from '@/react-app/components/IncomingCallModal'; // Now handled globally by AppWithCalls
@@ -67,27 +65,8 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
   const [pendingConnections, setPendingConnections] = useState<Connection[]>([]);
   const [, setForceUpdate] = useState(0);
 
-  // WebRTC integration (legacy - keeping for compatibility)
-  const {
-    callState,
-    toggleScreenShare
-  } = useWebRTC(user?.id || '', user?.name || '');
-
-  // Call signaling hook for comprehensive call management
-  const {
-    // call: activeCall, // Now handled globally by AppWithCalls
-    // localStream: callLocalStream, // Now handled globally by AppWithCalls
-    // remoteStream: callRemoteStream, // Now handled globally by AppWithCalls
-    // incomingCall: signalingIncomingCall, // Now handled globally by AppWithCalls
-    // callState: signalingCallState, // Now handled globally by AppWithCalls
-    // acceptCall: acceptSignalingCall, // Now handled globally by AppWithCalls
-    // rejectCall: rejectSignalingCall, // Now handled globally by AppWithCalls
-    // endCall: endSignalingCall, // Now handled globally by AppWithCalls
-    // toggleAudio: toggleSignalingAudio, // Now handled globally by AppWithCalls
-    // toggleVideo: toggleSignalingVideo, // Now handled globally by AppWithCalls
-    // startScreenShare: startSignalingScreenShare, // Now handled globally by AppWithCalls
-    // stopScreenShare: stopSignalingScreenShare // Now handled globally by AppWithCalls
-  } = useCallSignaling(user?.id || '', user?.name || '');
+  // Call functionality is now handled globally by AppWithCalls
+  // All call-related hooks and state management have been moved to the global level
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -95,14 +74,13 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
   useEffect(() => {
     if (user?.id) {
       initializeServices();
+      setupEventHandlers();
     }
 
-    // Cleanup function
+    // Cleanup function - remove all listeners
     return () => {
-      // Remove WebSocket event listeners
-      webSocketService.off('message', () => {});
-      webSocketService.off('typing', () => {});
-      webSocketService.off('call_history', () => {});
+      // Note: WebSocket service should handle cleanup when disconnecting
+      console.log('🧹 Cleaning up EnhancedMessages component');
     };
   }, [user?.id]);
 
@@ -121,16 +99,13 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
       await webSocketService.connect(user?.id || '');
       
       // Check and set initial connection status
-      const currentStatus = webSocketService.getConnectionState();
+      const currentStatus = webSocketService.isConnected() ? 'connected' : 'disconnected';
       console.log('🔌 Initial WebSocket connection status:', currentStatus);
       setConnectionStatus(currentStatus);
       
       // Load initial data
       loadChats();
       loadConversations();
-      
-      // Set up event handlers
-      setupEventHandlers();
       
     } catch (error) {
       console.error('Error initializing services:', error);
@@ -159,31 +134,27 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
     messagingService.on('connection_status', handleConnectionStatus);
 
     // WebSocket connection status
-    webSocketService.on('connection_status', (status: any) => {
+    const connectionStatusHandler = (status: any) => {
       console.log('🔌 WebSocket connection status:', status);
       setConnectionStatus(status.status);
-    });
+    };
 
-    webSocketService.on('connected', () => {
+    const connectedHandler = () => {
       console.log('✅ WebSocket connected');
       setConnectionStatus('connected');
-    });
+    };
 
-    webSocketService.on('disconnected', () => {
+    const disconnectedHandler = () => {
       console.log('❌ WebSocket disconnected');
       setConnectionStatus('disconnected');
-    });
+    };
 
-    // Handle server connection established event
-    webSocketService.on('connection_established', (payload: any) => {
+    const connectionEstablishedHandler = (payload: any) => {
       console.log('🔌 Server connection established:', payload);
       setConnectionStatus('connected');
-    });
+    };
 
-    // Direct WebSocket events for real-time communication
-    console.log('🔧 Registering WebSocket event listeners...');
-    console.log('📋 WebSocketService instance:', webSocketService);
-    webSocketService.on('message', (payload: any) => {
+    const messageHandler = (payload: any) => {
       console.log("------===------------------------------------------------------msg");
       
       console.log('📨 Received WebSocket message:', payload);
@@ -343,9 +314,9 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
         
         return updatedChats;
       });
-    });
+    };
 
-    webSocketService.on('typing', (payload: any) => {
+    const typingHandler = (payload: any) => {
       console.log('⌨️ Received typing indicator:', payload);
       console.log(payload.chatId, selectedChatRef.current, payload.userId ,user?.id);
       
@@ -412,7 +383,7 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
           }, 3000);
         }
       }
-    });
+    };
 
     // Handle incoming call notifications
     webSocketService.on('call_initiate', (payload: any) => {
@@ -446,34 +417,63 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
     webSocketService.on('call_history', (payload: any) => {
       console.log('📞 Call history received:', payload);
       
-      // Create call history message
+      // Create a detailed call history message
+      const callType = payload.callType === 'video' ? 'Video' : 'Audio';
+      const duration = payload.duration || 0;
+      const status = payload.status || 'completed';
+      const content = `${callType} call ${status}`;
+      
       const callHistoryMessage: Message = {
-        id: payload.id || `call-history-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        chatId: payload.chatId,
-        senderId: payload.senderId || 'system',
-        senderName: payload.senderName || 'System',
-        content: payload.content,
+        id: `call-history-${payload.callId}`, // Use callId for consistent ID
+        chatId: selectedChat || payload.fromUserId || 'default',
+        senderId: 'system',
+        senderName: 'System',
+        content: content,
         timestamp: payload.timestamp || new Date().toISOString(),
         messageType: 'call_history',
+        callMetadata: {
+          callId: payload.callId,
+          callType: payload.callType || 'audio',
+          duration: duration,
+          participants: payload.participants || []
+        },
         isRead: false,
         isDelivered: true
       };
 
-      // Add to messages if it's for the current chat
-      if (payload.chatId === selectedChat) {
-        setMessages(prev => {
-          // Check if message already exists
-          const exists = prev.some(msg => msg.id === callHistoryMessage.id);
-          if (exists) {
-            console.log('Call history message already exists, skipping');
-            return prev;
-          }
-          
-          console.log('Adding call history message:', callHistoryMessage);
-          return [...prev, callHistoryMessage];
-        });
-      }
+      console.log('📞 Adding call history message:', callHistoryMessage);
+      console.log('📞 Current selected chat:', selectedChat);
+      console.log('📞 Message chatId:', callHistoryMessage.chatId);
+
+      // Add to messages in the current chat
+      setMessages(prev => {
+        console.log('📞 Current messages count:', prev.length);
+        // Enhanced duplicate checking - check by ID, callId, and content
+        const exists = prev.some(msg => 
+          msg.id === callHistoryMessage.id || 
+          (msg.messageType === 'call_history' && 
+           msg.content === callHistoryMessage.content &&
+           Math.abs(new Date(msg.timestamp).getTime() - new Date(callHistoryMessage.timestamp).getTime()) < 5000) // within 5 seconds
+        );
+        if (exists) {
+          console.log('Call history message already exists, skipping');
+          return prev;
+        }
+        
+        console.log('📞 Adding call history message to state. New count:', prev.length + 1);
+        const newMessages = [...prev, callHistoryMessage];
+        console.log('📞 New messages:', newMessages);
+        return newMessages;
+      });
     });
+
+    // Register WebSocket handlers
+    webSocketService.on('connection_status', connectionStatusHandler);
+    webSocketService.on('connected', connectedHandler);
+    webSocketService.on('disconnected', disconnectedHandler);
+    webSocketService.on('connection_established', connectionEstablishedHandler);
+    webSocketService.on('message', messageHandler);
+    webSocketService.on('typing', typingHandler);
   };
 
   const loadChats = () => {
@@ -718,7 +718,7 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
     if (selectedChat) {
       // Send via both messaging service and direct WebSocket
       messagingService.sendTypingIndicator(selectedChat, isTyping);
-      webSocketService.sendTyping(selectedChat, isTyping);
+      webSocketService.sendTypingIndicator(selectedChat, isTyping);
     }
   };
 
@@ -789,7 +789,7 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
   // Periodically check WebSocket connection status
   useEffect(() => {
     const checkConnectionStatus = () => {
-      const currentStatus = webSocketService.getConnectionState();
+      const currentStatus = webSocketService.isConnected() ? 'connected' : 'disconnected';
       if (currentStatus !== connectionStatus) {
         console.log('🔄 Connection status changed:', connectionStatus, '->', currentStatus);
         setConnectionStatus(currentStatus);
@@ -881,10 +881,36 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
     }
 
     if (message.messageType === 'call_history') {
+      // Parse call metadata if available
+      const callMetadata = message.callMetadata;
+      const callType = callMetadata?.callType || 'audio';
+      const duration = callMetadata?.duration || 0;
+      const status = 'completed'; // Default status since it's not in the metadata structure
+      
       return (
-        <div className="flex items-center space-x-2 text-blue-600 dark:text-blue-400">
-          <PhoneIcon className="h-4 w-4" />
-          <span className="text-sm font-medium">{message.content}</span>
+        <div className="flex items-center justify-center w-full">
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 max-w-xs">
+            <div className="flex items-center space-x-2 text-blue-600 dark:text-blue-400">
+              <div className="flex items-center space-x-1">
+                {callType === 'video' ? (
+                  <VideoCameraIcon className="h-4 w-4" />
+                ) : (
+                  <PhoneIcon className="h-4 w-4" />
+                )}
+                <span className="text-sm font-medium">
+                  {callType === 'video' ? 'Video' : 'Audio'} call
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between mt-1 text-xs text-blue-500 dark:text-blue-400">
+              <span className="capitalize">{status}</span>
+              {duration > 0 && (
+                <span className="font-mono">
+                  {Math.floor(duration / 60)}:{(duration % 60).toString().padStart(2, '0')}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       );
     }
@@ -972,7 +998,7 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
               </button>
               <button
                 onClick={() => {
-                  const currentStatus = webSocketService.getConnectionState();
+                  const currentStatus = webSocketService.isConnected() ? 'connected' : 'disconnected';
                   console.log('🔍 Manual connection status check:', currentStatus);
                   setConnectionStatus(currentStatus);
                   toast.success(`Connection status: ${currentStatus}`);
@@ -1152,10 +1178,13 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
                     <VideoCameraIcon className="h-5 w-5" />
                   </button>
                   <button
-                    onClick={toggleScreenShare}
-                    disabled={!callState.isInCall || callState.callType !== 'video'}
-                    title={callState.isInCall && callState.callType === 'video' ? 'Toggle screen sharing' : 'Start a video call first'}
-                    className={`p-2 rounded-lg transition-colors ${callState.isInCall && callState.callType === 'video' ? 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' : 'text-gray-400 cursor-not-allowed'}`}
+                    onClick={() => {
+                      // Screen sharing functionality will be handled by the global call system
+                      toast('Screen sharing will be available during video calls');
+                    }}
+                    disabled={true}
+                    title="Screen sharing available during video calls"
+                    className="p-2 rounded-lg transition-colors text-gray-400 cursor-not-allowed"
                   >
                     <ComputerDesktopIcon className="h-5 w-5" />
                   </button>

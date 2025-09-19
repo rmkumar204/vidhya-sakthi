@@ -1,5 +1,4 @@
-// WebSocket Service for Real-time Communication
-export interface WebSocketMessage {
+interface WebSocketMessage {
   type: 'message' | 'user_joined' | 'user_left' | 'typing' | 'call_offer' | 'call_answer' | 'call_ice_candidate' | 'call_end' | 'call_mute_status' | 'call_video_status' | 'call_ringing' | 'scheduled_message';
   payload: any;
   from?: string;
@@ -18,7 +17,7 @@ export class WebSocketService {
   private connectionPromise: Promise<void> | null = null;
   private callEndThrottle: Map<string, number> = new Map(); // Throttle call_end messages
 
-  constructor(private serverUrl: string = 'ws://localhost:1883') {
+  constructor(private serverUrl: string = 'ws://localhost:8080') {
     // Ensure WebSocket URL uses correct protocol and handles different environments
     if (typeof window !== 'undefined') {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -26,10 +25,10 @@ export class WebSocketService {
       
       // Handle different deployment scenarios
       if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        this.serverUrl = `${protocol}//localhost:1883`;
+        this.serverUrl = `${protocol}//localhost:8080`;
       } else {
         // For production or different domains, use current host
-        this.serverUrl = `${protocol}//${hostname}:1883`;
+        this.serverUrl = `${protocol}//${hostname}:8080`;
       }
       
       console.log('🔌 WebSocket URL determined for', navigator.userAgent.includes('Chrome') ? 'Chrome' : navigator.userAgent.includes('Edge') ? 'Edge' : 'Browser', ':', this.serverUrl);
@@ -51,7 +50,7 @@ export class WebSocketService {
     this.currentUserId = userId;
 
     this.connectionPromise = new Promise((resolve, reject) => {
-      let connectionTimeout: ReturnType<typeof setTimeout> | null = null;
+      let connectionTimeout: ReturnType<typeof setTimeout> | undefined;
       
       try {
         // Close existing connection if any
@@ -62,6 +61,8 @@ export class WebSocketService {
         
         const wsUrl = `${this.serverUrl}?userId=${encodeURIComponent(userId)}&browser=${encodeURIComponent(navigator.userAgent)}`;
         console.log('🚀 Connecting to WebSocket:', wsUrl);
+        
+        // Browser-specific WebSocket options
         
         this.ws = new WebSocket(wsUrl);
         
@@ -178,12 +179,6 @@ export class WebSocketService {
         timestamp: Date.now()
       };
       console.log('📤 Sending WebSocket message:', message);
-      console.log('📤 Message details:', {
-        type: message.type,
-        to: message.to,
-        from: message.from,
-        payloadKeys: Object.keys(message.payload)
-      });
       this.ws.send(JSON.stringify(message));
     } else {
       console.error('❌ WebSocket is not connected - readyState:', this.ws?.readyState);
@@ -205,18 +200,6 @@ export class WebSocketService {
       chatId,
       isTyping,
       userId: this.currentUserId
-    });
-  }
-
-  // Alias for backward compatibility
-  sendTyping(chatId: string, isTyping: boolean) {
-    this.sendTypingIndicator(chatId, isTyping);
-  }
-
-  markMessageAsRead(chatId: string, messageId: string): void {
-    this.sendMessage('message_read', {
-      chatId,
-      messageId
     });
   }
 
@@ -284,20 +267,7 @@ export class WebSocketService {
   isConnected(): boolean {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
   }
-
-  getConnectionState(): string {
-    if (!this.ws) return 'disconnected';
-    
-    switch (this.ws.readyState) {
-      case WebSocket.CONNECTING: return 'connecting';
-      case WebSocket.OPEN: return 'connected';
-      case WebSocket.CLOSING: return 'closing';
-      case WebSocket.CLOSED: return 'disconnected';
-      default: return 'unknown';
-    }
-  }
 }
 
 // Singleton instance
 export const webSocketService = new WebSocketService();
-export default webSocketService;

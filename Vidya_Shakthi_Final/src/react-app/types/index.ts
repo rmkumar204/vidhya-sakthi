@@ -55,6 +55,7 @@ export enum CallStatus {
   IDLE = 'idle',
   RINGING = 'ringing',
   ACTIVE = 'active',
+  CONNECTED = 'connected',
   REJECTED = 'rejected',
   ENDED = 'ended'
 }

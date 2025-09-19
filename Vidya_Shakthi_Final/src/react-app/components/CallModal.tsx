@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Call } from '../types';
-import { PhoneIcon, VideoCameraIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { PhoneIcon, XIcon } from './Icons';
 
 interface CallModalProps {
   call: Call;
@@ -9,43 +9,45 @@ interface CallModalProps {
 }
 
 const CallModal: React.FC<CallModalProps> = ({ call, onAccept, onReject }) => {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-lg p-8 max-w-md w-full mx-4 text-center">
-        <div className="mb-6">
-          <div className="w-20 h-20 rounded-full bg-slate-600 flex items-center justify-center mx-auto mb-4">
-            <span className="text-white font-bold text-2xl">
-              {call.from.name.charAt(0).toUpperCase()}
-            </span>
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-2">
-            Incoming {call.type} call
-          </h2>
-          <p className="text-slate-400">
-            {call.from.name} is calling you
-          </p>
-        </div>
+  const audioRef = useRef<HTMLAudioElement>(null);
 
-        <div className="flex justify-center space-x-4">
-          <button
-            onClick={onAccept}
-            className="flex items-center justify-center w-16 h-16 rounded-full bg-green-500 hover:bg-green-600 text-white transition-colors"
-          >
-            {call.type === 'audio' ? (
-              <PhoneIcon className="h-8 w-8" />
-            ) : (
-              <VideoCameraIcon className="h-8 w-8" />
-            )}
+  useEffect(() => {
+    // Create a simple ringtone using Web Audio API
+    const playRingtone = () => {
+      if (audioRef.current) {
+        audioRef.current.play().catch(console.error);
+      }
+    };
+
+    playRingtone();
+    
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center">
+      <div className="bg-slate-800 rounded-lg shadow-xl p-8 flex flex-col items-center gap-6 border border-slate-600 animate-pulse">
+        <img src={call.from.avatarUrl} alt={call.from.name} className="w-24 h-24 rounded-full border-4 border-slate-500" />
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-white">{call.from.name}</h2>
+          <p className="text-slate-400">is calling you...</p>
+        </div>
+        <div className="flex gap-4">
+          <button onClick={onReject} className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-6 rounded-full transition-colors">
+            <XIcon /> Decline
           </button>
-          
-          <button
-            onClick={onReject}
-            className="flex items-center justify-center w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors"
-          >
-            <XMarkIcon className="h-8 w-8" />
+          <button onClick={onAccept} className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-6 rounded-full transition-colors">
+            <PhoneIcon /> Accept
           </button>
         </div>
       </div>
+      <audio ref={audioRef} loop>
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmMdCCiN0/PSgjUG" type="audio/wav" />
+      </audio>
     </div>
   );
 };

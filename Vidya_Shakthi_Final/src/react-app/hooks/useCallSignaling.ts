@@ -47,6 +47,69 @@ const useCallSignaling = (currentUser: User | null) => {
       }
     };
 
+    const handleCallAccept = (data: any) => {
+      console.log('✅ ❗ useCallSignaling: Call accept signal received via WebSocket:', data);
+      console.log('🔍 Current call state before handling accept:', {
+        callId: call?.id,
+        callStatus: call?.status,
+        fromUser: call?.from?.id,
+        toUser: call?.to?.id,
+        currentUserId: currentUser?.id,
+        dataFromUserId: data?.fromUserId,
+        dataCallId: data?.callId
+      });
+      
+      // More robust check: accept message should be from the person we're calling
+      if (call && call.status === CallStatus.RINGING) {
+        // Additional validation: ensure this accept message is for our current call
+        const isValidAccept = !data?.callId || data.callId === call.id;
+        const isFromExpectedUser = !data?.fromUserId || data.fromUserId === call.to.id;
+        
+        if (isValidAccept && isFromExpectedUser) {
+          console.log('🔄 Updating call status to ACTIVE after remote acceptance');
+          const acceptedCall: Call = { ...call, status: CallStatus.ACTIVE };
+          setCall(acceptedCall);
+          updateCallState(acceptedCall);
+          
+          console.log('✅ Call status updated to ACTIVE on caller side');
+          
+          // Force trigger React re-render by dispatching custom event
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('connectsphere-call-state-changed', {
+              detail: { call: acceptedCall, action: 'call_accepted' }
+            }));
+            
+            // Additional force refresh for app component
+            window.dispatchEvent(new CustomEvent('connectsphere-call-update'));
+          }, 100);
+        } else {
+          console.log('⚠️ Call accept validation failed:', {
+            isValidAccept,
+            isFromExpectedUser,
+            expectedCallId: call.id,
+            receivedCallId: data?.callId,
+            expectedFromUser: call.to.id,
+            receivedFromUser: data?.fromUserId
+          });
+        }
+      } else {
+        console.log('⚠️ No ringing call found to update or call already active. Current call:', {
+          hasCall: !!call,
+          callStatus: call?.status,
+          expectedStatus: CallStatus.RINGING,
+          callId: call?.id
+        });
+        
+        // Emergency fallback: if we have any call and it's not ACTIVE, force it to ACTIVE
+        if (call && call.status !== CallStatus.ACTIVE && call.status !== CallStatus.CONNECTED) {
+          console.log('🆘 Emergency fallback: forcing call to ACTIVE state');
+          const emergencyActiveCall: Call = { ...call, status: CallStatus.ACTIVE };
+          setCall(emergencyActiveCall);
+          updateCallState(emergencyActiveCall);
+        }
+      }
+    };
+
     const handleCallEnd = (data: any) => {
       console.log('🔴 ❗ useCallSignaling: Call end signal received via WebSocket:', data);
       
@@ -133,8 +196,16 @@ const useCallSignaling = (currentUser: User | null) => {
     }
 
     // WebSocket listeners
+    console.log('🔍 Registering WebSocket listeners for useCallSignaling...');
     webSocketService.on('call_offer', handleIncomingCall);
     webSocketService.on('call_end', handleCallEnd);
+    webSocketService.on('call_accept', handleCallAccept);
+    console.log('✅ WebSocket listeners registered successfully');
+    
+    // Debug current listeners
+    setTimeout(() => {
+      webSocketService.debugListeners();
+    }, 100);
     
     // Storage listeners (fallback)
     window.addEventListener('storage', handleStorageChange);
@@ -143,6 +214,7 @@ const useCallSignaling = (currentUser: User | null) => {
     return () => {
       webSocketService.off('call_offer', handleIncomingCall);
       webSocketService.off('call_end', handleCallEnd);
+      webSocketService.off('call_accept', handleCallAccept);
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('connectsphere-call-update', handleCallUpdate);
       
@@ -166,18 +238,33 @@ const useCallSignaling = (currentUser: User | null) => {
       updateCallState(null);
     };
 
+    const handleWebRTCCallAccept = (data: any) => {
+      console.log('✅ WebRTC service triggered call accept callback:', data);
+      // This is handled by WebSocket message, just for additional logging
+    };
+
     webRTCService.onRemoteStream(handleRemoteStream);
     webRTCService.onCallEnd(handleWebRTCCallEnd);
+    webRTCService.onCallAccept(handleWebRTCCallAccept);
 
     return () => {
       // Clear WebRTC callbacks to prevent memory leaks
       webRTCService.onRemoteStream(() => {});
       webRTCService.onCallEnd(() => {});
+      webRTCService.onCallAccept(() => {});
       console.log('🧹 useCallSignaling: Cleaned up WebRTC callbacks');
     };
   }, []); // Empty dependency array - only run once
 
   const updateCallState = (newCallState: Call | null) => {
+    console.log('🔄 updateCallState called:', {
+      previous: call?.status,
+      new: newCallState?.status,
+      callId: newCallState?.id,
+      fromUser: newCallState?.from?.id,
+      toUser: newCallState?.to?.id
+    });
+    
     setCall(newCallState);
     if (newCallState) {
         const callStateWithTimestamp = {
@@ -301,6 +388,12 @@ const useCallSignaling = (currentUser: User | null) => {
         const acceptedCall: Call = { ...call, status: CallStatus.ACTIVE };
         setCall(acceptedCall);
         updateCallState(acceptedCall);
+        
+        // Send call accept notification to the caller BEFORE answering WebRTC
+        console.log('✅ Sending call accept notification to caller:', call.from.id);
+        if (webSocketService.isConnected()) {
+          webSocketService.sendCallAccept(call.from.id, call.id);
+        }
         
         // Answer the WebRTC call with proper call type
         const stream = await webRTCService.answerCall(currentUser.id, call.from.id, call.type);
@@ -439,10 +532,38 @@ const useCallSignaling = (currentUser: User | null) => {
   // Expose emergency reset function globally for debugging
   useEffect(() => {
     (window as any).emergencyCallReset = emergencyReset;
+    (window as any).debugWebSocketListeners = () => {
+      console.log('🔍 Debugging WebSocket listeners from useCallSignaling:');
+      webSocketService.debugListeners();
+    };
+    (window as any).debugCallState = () => {
+      console.log('📡 Current call state:', {
+        call: call,
+        callStatus: call?.status,
+        fromUser: call?.from?.id,
+        toUser: call?.to?.id,
+        currentUser: currentUser?.id,
+        localStream: !!localStream,
+        remoteStream: !!remoteStream
+      });
+    };
+    (window as any).forceCallActive = () => {
+      if (call && call.status === CallStatus.RINGING) {
+        console.log('🔴 Forcing call state to ACTIVE for debugging');
+        const activeCall: Call = { ...call, status: CallStatus.ACTIVE };
+        setCall(activeCall);
+        updateCallState(activeCall);
+      } else {
+        console.log('⚠️ No ringing call to activate');
+      }
+    };
     return () => {
       delete (window as any).emergencyCallReset;
+      delete (window as any).debugWebSocketListeners;
+      delete (window as any).debugCallState;
+      delete (window as any).forceCallActive;
     };
-  }, [emergencyReset]);
+  }, [emergencyReset, call, currentUser, localStream, remoteStream]);
 
   return {
     call, 

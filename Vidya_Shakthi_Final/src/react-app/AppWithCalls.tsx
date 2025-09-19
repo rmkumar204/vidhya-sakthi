@@ -88,7 +88,7 @@ const CallManager: React.FC = () => {
     endCall: signalingEndCall
   } = useCallSignaling(currentUser);
 
-  // Handle call state changes
+  // Handle call state changes with additional event listener for reliability
   useEffect(() => {
     if (callState) {
       const updateCallWithUserData = async () => {
@@ -105,6 +105,22 @@ const CallManager: React.FC = () => {
       
       updateCallWithUserData();
     }
+    
+    // Add custom event listener for call state changes (additional reliability)
+    const handleCallStateChanged = (event: CustomEvent) => {
+      console.log('🔔 AppWithCalls: Custom call state change event received:', event.detail);
+      // Force a re-render by updating a dummy state if needed
+      if (event.detail?.action === 'call_accepted') {
+        console.log('✅ Call accepted event detected, ensuring UI updates');
+        // The state should already be updated, but this ensures React re-renders
+      }
+    };
+    
+    window.addEventListener('connectsphere-call-state-changed', handleCallStateChanged as EventListener);
+    
+    return () => {
+      window.removeEventListener('connectsphere-call-state-changed', handleCallStateChanged as EventListener);
+    };
   }, [callState, user, users]);
 
   // Call handlers
@@ -142,12 +158,86 @@ const CallManager: React.FC = () => {
     signalingEndCall();
   };
 
-  // Determine call states
+  // Determine call states with improved logic
   const isReceivingCall = callState && callState.status === CallStatus.RINGING && callState.to.id === user?.id;
   const isOutgoingCall = callState && callState.status === CallStatus.RINGING && callState.from.id === user?.id;
-  const isCallActive = callState && (callState.status === CallStatus.ACTIVE || callState.status === CallStatus.CONNECTED) && (callState.to.id === user?.id || callState.from.id === user?.id);
+  const isCallActive = callState && (callState.status === CallStatus.ACTIVE || callState.status === CallStatus.CONNECTED);
   const isAudioCall = callState && callState.type === 'audio';
   const otherUserInCall = callState ? (callState.from.id === user?.id ? callState.to : callState.from) : null;
+
+  // Debug call state logic with enhanced logging
+  useEffect(() => {
+    if (callState) {
+      console.log('📡 ❗ AppWithCalls: Call state changed:', {
+        callId: callState.id,
+        callStatus: callState.status,
+        fromUser: callState.from.id,
+        toUser: callState.to.id,
+        currentUser: user?.id,
+        isReceivingCall,
+        isOutgoingCall,
+        isCallActive,
+        callType: callState.type,
+        shouldShowIncoming: isReceivingCall,
+        shouldShowOutgoing: isOutgoingCall,
+        shouldShowActiveCall: isCallActive
+      });
+      
+      // Additional debug: Check what UI components should be visible
+      if (isCallActive) {
+        console.log('🎯 Active call detected - should show AudioCallView/VideoCallView');
+      } else if (isOutgoingCall) {
+        console.log('📞 Outgoing call detected - should show OutgoingCallModal');
+      } else if (isReceivingCall) {
+        console.log('📲 Incoming call detected - should show CallModal');
+      }
+    } else {
+      console.log('📡 AppWithCalls: No call state - all call components should be hidden');
+    }
+  }, [callState?.status, callState?.id, isReceivingCall, isOutgoingCall, isCallActive]);
+
+  // Expose debugging functions globally for testing
+  useEffect(() => {
+    (window as any).debugAppCallState = () => {
+      console.log('📡 ❗ AppWithCalls Debug State:');
+      console.log('- callState:', callState);
+      console.log('- callState.status:', callState?.status);
+      console.log('- callState.from.id:', callState?.from?.id);
+      console.log('- callState.to.id:', callState?.to?.id);
+      console.log('- user.id:', user?.id);
+      console.log('- isReceivingCall:', isReceivingCall);
+      console.log('- isOutgoingCall:', isOutgoingCall);
+      console.log('- isCallActive:', isCallActive);
+      console.log('- otherUserInCall:', otherUserInCall);
+      
+      return {
+        callState,
+        user: user?.id,
+        states: {
+          isReceivingCall,
+          isOutgoingCall,
+          isCallActive
+        }
+      };
+    };
+    
+    (window as any).forceCallActive = () => {
+      if (callState) {
+        console.log('🔴 Manually forcing call to ACTIVE state for debugging');
+        const activeCall = { ...callState, status: CallStatus.ACTIVE };
+        console.log('Force updating call state to:', activeCall);
+        // This would need to trigger the useCallSignaling to update
+        // For debugging purposes only
+      } else {
+        console.log('⚠️ No call state available to force active');
+      }
+    };
+    
+    return () => {
+      delete (window as any).debugAppCallState;
+      delete (window as any).forceCallActive;
+    };
+  }, [callState, user, isReceivingCall, isOutgoingCall, isCallActive, otherUserInCall]);
 
   return (
     <>

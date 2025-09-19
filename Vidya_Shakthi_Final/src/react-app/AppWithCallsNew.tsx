@@ -182,10 +182,24 @@ const CallManager: React.FC = () => {
   // Determine call states
   const isReceivingCall = incomingCall !== null;
   const isOutgoingCall = currentCall && currentCall.status === 'ringing' && !isReceivingCall;
-  const isAudioCallActive = currentCall && currentCall.status === 'connected' && currentCall.type === 'audio';
-  const isVideoCallActive = currentCall && currentCall.status === 'connected' && currentCall.type === 'video';
+  // Enhanced: Also check for 'active' status for calls that have been accepted
+  const isAudioCallActive = currentCall && 
+    (currentCall.status === 'connected' || currentCall.status === 'active') && 
+    currentCall.type === 'audio';
+  const isVideoCallActive = currentCall && 
+    (currentCall.status === 'connected' || currentCall.status === 'active') && 
+    currentCall.type === 'video';
   const isVideoCallRequest = (incomingCall && incomingCall.callType === 'video') || 
                             (currentCall && currentCall.type === 'video' && currentCall.status === 'ringing');
+  
+  console.log('🔍 CallManager: Current call states:', {
+    isReceivingCall,
+    isOutgoingCall, 
+    isAudioCallActive,
+    isVideoCallActive,
+    currentCallStatus: currentCall?.status,
+    incomingCallExists: !!incomingCall
+  });
 
   return (
     <div className="h-screen flex flex-col">

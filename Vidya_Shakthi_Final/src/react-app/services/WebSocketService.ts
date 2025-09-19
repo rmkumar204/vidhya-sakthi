@@ -1,5 +1,5 @@
 interface WebSocketMessage {
-  type: 'message' | 'user_joined' | 'user_left' | 'typing' | 'call_offer' | 'call_answer' | 'call_ice_candidate' | 'call_end' | 'call_mute_status' | 'call_video_status' | 'call_ringing' | 'scheduled_message';
+  type: 'message' | 'user_joined' | 'user_left' | 'typing' | 'call_offer' | 'call_answer' | 'call_ice_candidate' | 'call_end' | 'call_mute_status' | 'call_video_status' | 'call_ringing' | 'call_accept' | 'scheduled_message';
   payload: any;
   from?: string;
   to?: string;
@@ -184,6 +184,7 @@ export class WebSocketService {
       this.listeners.set(eventType, []);
     }
     this.listeners.get(eventType)!.push(callback);
+    console.log(`🔍 WebSocket listener registered for '${eventType}'. Total listeners: ${this.listeners.get(eventType)!.length}`);
   }
 
   off(eventType: string, callback: (data: any) => void) {
@@ -191,6 +192,7 @@ export class WebSocketService {
     const index = listeners.indexOf(callback);
     if (index > -1) {
       listeners.splice(index, 1);
+      console.log(`🗑️ WebSocket listener removed for '${eventType}'. Remaining listeners: ${listeners.length}`);
     }
   }
 
@@ -234,7 +236,13 @@ export class WebSocketService {
   }
 
   sendCallAnswer(to: string, answer: RTCSessionDescriptionInit) {
+    console.log('📞 Sending call answer to:', to);
     this.sendMessage('call_answer', { answer }, to);
+  }
+
+  sendCallAccept(to: string, callId?: string) {
+    console.log('✅ Sending call accept notification to:', to);
+    this.sendMessage('call_accept', { callId }, to);
   }
 
   sendIceCandidate(to: string, candidate: RTCIceCandidateInit) {
@@ -342,6 +350,13 @@ export class WebSocketService {
     this.sendMessage('connection_response', {
       requestId,
       status
+    });
+  }
+
+  debugListeners(): void {
+    console.log('🔍 Current WebSocket listeners:');
+    this.listeners.forEach((callbacks, eventType) => {
+      console.log(`  - ${eventType}: ${callbacks.length} listener(s)`);
     });
   }
 }

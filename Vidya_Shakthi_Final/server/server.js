@@ -226,10 +226,27 @@ class SignalingServer {
   }
 
   handleCallAccept(fromUserId, payload) {
-    const { callId, targetUserId } = payload;
+    console.log("✅ Handling call accept from", fromUserId, ":", payload);
+    const { callId, targetUserId, toUserId } = payload;
     
-    const targetClient = this.clients.get(targetUserId);
+    // Support multiple ways to get target user ID
+    const targetUser = this.currentMessageTo || targetUserId || toUserId;
+    
+    if (!targetUser) {
+      console.error("❌ No target user ID found in call accept. Checked:", {
+        messageTo: this.currentMessageTo,
+        targetUserId,
+        toUserId,
+        payload
+      });
+      return;
+    }
+    
+    console.log("🎯 Target user for call accept:", targetUser);
+    
+    const targetClient = this.clients.get(targetUser);
     if (targetClient && targetClient.readyState === WebSocket.OPEN) {
+      console.log("📤 Sending call accept to user", targetUser);
       targetClient.send(JSON.stringify({
         type: 'call_accept',
         payload: {
@@ -238,6 +255,10 @@ class SignalingServer {
           timestamp: new Date().toISOString()
         }
       }));
+      console.log("✅ Call accept sent successfully to", targetUser);
+    } else {
+      console.error("❌ Target user", targetUser, "not connected or WebSocket not open. ReadyState:", targetClient?.readyState);
+      console.log("📋 Available connected users:", Array.from(this.clients.keys()));
     }
   }
 

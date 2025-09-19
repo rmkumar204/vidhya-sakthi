@@ -19,6 +19,7 @@ export class WebRTCService {
   private remoteUserId: string | null = null;
   private onRemoteStreamCallback: ((stream: MediaStream) => void) | null = null;
   private onCallEndCallback: (() => void) | null = null;
+  private onCallAcceptCallback: ((data: any) => void) | null = null;
   private isEnding = false; // Flag to prevent multiple end operations
 
   constructor(private config: WebRTCConfig = defaultConfig) {
@@ -30,6 +31,7 @@ export class WebRTCService {
     webSocketService.on('call_answer', this.handleCallAnswer.bind(this));
     webSocketService.on('call_ice_candidate', this.handleIceCandidate.bind(this));
     webSocketService.on('call_end', this.handleCallEnd.bind(this));
+    webSocketService.on('call_accept', this.handleCallAccept.bind(this));
   }
 
   async initializeCall(userId: string, remoteUserId: string, callType: 'video' | 'audio'): Promise<MediaStream> {
@@ -430,6 +432,18 @@ export class WebRTCService {
     console.log('✅ WebRTCService: Call end processing complete');
   }
 
+  private handleCallAccept(data: any) {
+    console.log('✅ ❗ WebRTCService: Received call_accept signal from WebSocket:', data);
+    console.log('🔄 WebRTCService: Call was accepted by remote user');
+    
+    // This is just for logging/state tracking - the actual WebRTC connection
+    // is established through the offer/answer exchange
+    if (this.onCallAcceptCallback) {
+      console.log('📞 Calling accept callback');
+      this.onCallAcceptCallback(data);
+    }
+  }
+
   endCall() {
     if (this.isEnding) {
       console.log('⚠️ Call end already in progress, ignoring duplicate call');
@@ -542,6 +556,13 @@ export class WebRTCService {
     this.onCallEndCallback = null;
     this.onCallEndCallback = callback;
     console.log('📁 WebRTC: Call end callback registered');
+  }
+
+  onCallAccept(callback: (data: any) => void) {
+    // Clear any existing callback to prevent multiple registrations
+    this.onCallAcceptCallback = null;
+    this.onCallAcceptCallback = callback;
+    console.log('📁 WebRTC: Call accept callback registered');
   }
 
   getLocalStream(): MediaStream | null {

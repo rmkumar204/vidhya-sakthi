@@ -21,7 +21,7 @@ const projectSchema: Schema = new Schema(
   {
     title: { type: String, required: true },
     description: { type: String },
-    mentor: { type: Schema.Types.ObjectId, ref: 'User', required: false },
+    mentor: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     status: {
       type: String,
       enum: ['open', 'in_progress', 'completed', 'on_hold', 'cancelled'],

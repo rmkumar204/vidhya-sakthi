@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { VoiceMessageRecorder } from './VoiceMessageRecorder';
+import { VoiceMessagePlayer } from './VoiceMessagePlayer';
 
 interface MessageInputProps {
-  onSendMessage: (message: string, files?: File[]) => void;
+  onSendMessage: (message: string, files?: File[], voiceBlob?: Blob) => void;
   onScheduleMessage: (message: string, files: File[] | undefined, scheduledFor: Date) => void;
   onTyping?: (isTyping: boolean) => void;
   placeholder?: string;
@@ -528,28 +530,34 @@ export default function MessageInput({
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showFormattingMenu, setShowFormattingMenu] = useState(false);
   const [showScheduler, setShowScheduler] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [showColorPicker, setShowColorPicker] = useState<'highlight' | 'fontColor' | null>(null);
   const [selectedHighlightColor, setSelectedHighlightColor] = useState('#fef08a');
   const [selectedFontColor, setSelectedFontColor] = useState('#ef4444');
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+  const [voiceMessage, setVoiceMessage] = useState<Blob | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
 
   // Auto-resize textarea when message changes
   useEffect(() => {
     adjustTextareaHeight();
   }, [message]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSendClick = () => {
+    console.log("🚀 handleSendClick called!");
+    console.log("Message state:", message);
+    console.log("Attached files:", attachedFiles);
+    console.log("Voice message:", voiceMessage);
+    
     const textContent = editorRef.current?.textContent?.trim() || '';
-    if (textContent || attachedFiles.length > 0) {
-      onSendMessage(message, attachedFiles.length > 0 ? attachedFiles : undefined);
+    console.log("Text content from editor:", textContent);
+    
+    if (textContent || attachedFiles.length > 0 || voiceMessage) {
+      console.log("✅ Sending message via onSendMessage");
+      onSendMessage(message, attachedFiles.length > 0 ? attachedFiles : undefined, voiceMessage || undefined);
       
       // Clear the contentEditable div
       if (editorRef.current) {
@@ -559,19 +567,45 @@ export default function MessageInput({
       // Clear state
       setMessage('');
       setAttachedFiles([]);
+      setVoiceMessage(null);
       
       // Stop typing indicator
       if (onTyping) {
         onTyping(false);
       }
+    } else {
+      console.log("❌ No content to send");
     }
+  };
+
+  const handleVoiceRecordingComplete = (audioBlob: Blob, duration: number) => {
+    setVoiceMessage(audioBlob);
+    setShowVoiceRecorder(false);
+    console.log(`Voice message recorded: ${duration}s`);
+  };
+
+  const handleVoiceRecordingCancel = () => {
+    setShowVoiceRecorder(false);
+  };
+
+  const handleDeleteVoiceMessage = () => {
+    setVoiceMessage(null);
+  };
+
+  // Keep handleSubmit for Enter key functionality
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSendClick();
   };
 
 
   const handleEditorChange = () => {
+    console.log("sdsdsdsdsd---------------------------");
+    
     if (editorRef.current) {
       const content = editorRef.current.innerHTML;
       const textContent = editorRef.current.textContent || '';
+      console.log("📝 Editor changed - HTML:", content, "Text:", textContent);
       setMessage(content);
       if (onTyping) {
         onTyping(textContent.trim().length > 0);
@@ -945,37 +979,6 @@ export default function MessageInput({
     setAttachedFiles(prev => [...prev, ...files]);
   };
 
-  const startVoiceRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-      
-      mediaRecorder.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data);
-      };
-      
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-        const audioFile = new File([audioBlob], 'voice-message.wav', { type: 'audio/wav' });
-        setAttachedFiles(prev => [...prev, audioFile]);
-        stream.getTracks().forEach(track => track.stop());
-      };
-      
-      mediaRecorder.start();
-      setIsRecording(true);
-    } catch (error) {
-      console.error('Error starting voice recording:', error);
-    }
-  };
-
-  const stopVoiceRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
-  };
 
 
   const handleSchedule = (date: Date) => {
@@ -1015,7 +1018,7 @@ export default function MessageInput({
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="flex items-center space-x-2">
+      <div className="flex items-center space-x-2">
         {/* Message input - Large, prominent rounded rectangle field on the left */}
         <div
           ref={editorRef}
@@ -1110,16 +1113,16 @@ export default function MessageInput({
               className="hidden"
             />
 
-            {/* Voice recording - Microphone */}
+            {/* Voice message - Microphone */}
           <button
               type="button"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                isRecording ? stopVoiceRecording() : startVoiceRecording();
+                setShowVoiceRecorder(true);
               }}
-              className={`p-2 rounded transition-colors ${isRecording ? 'text-red-400 bg-red-900/20' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`}
-              title={isRecording ? 'Stop recording' : 'Voice message'}
+              className="p-2 rounded transition-colors text-gray-400 hover:text-white hover:bg-gray-700"
+              title="Voice message"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clipRule="evenodd" />
@@ -1131,8 +1134,15 @@ export default function MessageInput({
         <div className="flex bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden">
           {/* Send button - Paper airplane icon */}
           <button
-            type="submit"
-            disabled={disabled || (!editorRef.current?.textContent?.trim() && attachedFiles.length === 0)}
+            type="button"
+            onClick={() => {
+              console.log('🚀 Send button clicked!');
+              console.log('Message content:', message);
+              console.log('Attached files:', attachedFiles.length);
+              console.log('Editor text content:', editorRef.current?.textContent?.trim());
+              handleSendClick();
+            }}
+            disabled={disabled || (!message.trim() && attachedFiles.length === 0)}
             className="flex items-center justify-center p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             title="Send message"
           >
@@ -1168,7 +1178,28 @@ export default function MessageInput({
           onClose={() => setShowScheduler(false)}
           onSchedule={handleSchedule}
         />
-      </form>
+
+        {/* Voice Message Recorder */}
+        {showVoiceRecorder && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <VoiceMessageRecorder
+              onRecordingComplete={handleVoiceRecordingComplete}
+              onCancel={handleVoiceRecordingCancel}
+              maxDuration={60}
+            />
+          </div>
+        )}
+
+        {/* Voice Message Player */}
+        {voiceMessage && (
+          <div className="mt-2">
+            <VoiceMessagePlayer
+              audioBlob={voiceMessage}
+              onDelete={handleDeleteVoiceMessage}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

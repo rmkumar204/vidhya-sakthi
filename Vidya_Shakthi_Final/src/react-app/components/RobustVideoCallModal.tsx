@@ -7,16 +7,22 @@ interface RobustVideoCallModalProps {
   user: User;
   onEndCall: () => void;
   onClose: () => void;
+  onAccept?: () => void;
+  onReject?: () => void;
 }
 
 export const RobustVideoCallModal: React.FC<RobustVideoCallModalProps> = ({
   call,
   user,
   onEndCall,
-  onClose
+  onClose,
+  onAccept,
+  onReject
 }) => {
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [connectionQuality, setConnectionQuality] = useState<'excellent' | 'good' | 'fair' | 'poor'>('poor');
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
 
   const { 
@@ -155,42 +161,40 @@ export const RobustVideoCallModal: React.FC<RobustVideoCallModalProps> = ({
   if (incomingCall) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-8 max-w-md w-full mx-4">
-          <div className="text-center">
-            <div className="mb-6">
-              <div className="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                Incoming {incomingCall.callType} call
-              </h2>
-              <p className="text-gray-600 dark:text-gray-300">
-                {incomingCall.from} is calling you
-              </p>
+        <div className="bg-slate-800 rounded-lg p-8 max-w-md w-full mx-4 text-center">
+          <div className="mb-6">
+            <div className="w-20 h-20 rounded-full bg-slate-600 flex items-center justify-center mx-auto mb-4">
+              <span className="text-white font-bold text-2xl">
+                {incomingCall.from ? incomingCall.from.charAt(0).toUpperCase() : 'U'}
+              </span>
             </div>
+            <h2 className="text-2xl font-bold text-white mb-2">
+              Incoming {incomingCall.callType} call
+            </h2>
+            <p className="text-slate-400">
+              {incomingCall.from || 'Unknown User'} is calling you
+            </p>
+          </div>
 
-            <div className="flex justify-center space-x-4">
-              <button
-                onClick={rejectCall}
-                className="bg-red-500 hover:bg-red-600 text-white p-4 rounded-full transition-colors"
-                title="Decline call"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-              <button
-                onClick={acceptCall}
-                className="bg-green-500 hover:bg-green-600 text-white p-4 rounded-full transition-colors"
-                title="Accept call"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </button>
-            </div>
+          <div className="flex justify-center space-x-4">
+            <button
+              onClick={onReject || rejectCall}
+              className="flex items-center justify-center w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors"
+              title="Decline call"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <button
+              onClick={onAccept || acceptCall}
+              className="flex items-center justify-center w-16 h-16 rounded-full bg-green-500 hover:bg-green-600 text-white transition-colors"
+              title="Accept call"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
@@ -236,11 +240,31 @@ export const RobustVideoCallModal: React.FC<RobustVideoCallModalProps> = ({
         </svg>
       </button>
 
-      {/* Simple Top Bar - Just time */}
-      <div className="absolute top-4 left-4 z-10">
+      {/* Enhanced Top Bar - Time and Connection Quality */}
+      <div className="absolute top-4 left-4 z-10 flex items-center space-x-4">
         <span className="text-white text-lg font-medium">
           {formatTime(currentTime)}
         </span>
+        
+        {/* Connection Quality Indicator */}
+        <div className="flex items-center space-x-2">
+          <div className={`w-2 h-2 rounded-full ${
+            connectionQuality === 'excellent' ? 'bg-green-500' :
+            connectionQuality === 'good' ? 'bg-yellow-500' :
+            connectionQuality === 'fair' ? 'bg-orange-500' : 'bg-red-500'
+          }`}></div>
+          <span className="text-white text-sm capitalize">
+            {connectionQuality}
+          </span>
+        </div>
+
+        {/* Reconnection Indicator */}
+        {isReconnecting && (
+          <div className="flex items-center space-x-2">
+            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-white text-sm">Reconnecting...</span>
+          </div>
+        )}
       </div>
 
       {/* Main Video Area */}
@@ -255,8 +279,19 @@ export const RobustVideoCallModal: React.FC<RobustVideoCallModalProps> = ({
           />
         ) : (
           <div className="flex items-center justify-center w-full h-full">
-            <div className="w-64 h-64 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center shadow-2xl">
-              <span className="text-6xl font-bold text-white">👤</span>
+            <div className="text-center">
+              <div className="w-64 h-64 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center shadow-2xl mx-auto mb-6">
+                <span className="text-6xl font-bold text-white">
+                  {(call.to?.name || call.from?.name || 'U').charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <h2 className="text-2xl font-semibold text-white mb-2">
+                {call.to?.name || call.from?.name || 'Unknown User'}
+              </h2>
+              <div className="flex items-center justify-center space-x-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span className="text-gray-400 text-sm">Online</span>
+              </div>
             </div>
           </div>
         )}
@@ -292,6 +327,23 @@ export const RobustVideoCallModal: React.FC<RobustVideoCallModalProps> = ({
               <p className={`text-red-500 ${isMaximized ? 'text-lg' : 'text-sm'}`}>Camera Off</p>
             </div>
           </div>
+        )}
+
+        {/* Separate Audio Elements for Better Control */}
+        {callState.remoteStreams.size > 0 && (
+          <audio
+            autoPlay
+            playsInline
+            className="hidden"
+            ref={(audio) => {
+              if (audio && callState.remoteStreams.size > 0) {
+                const remoteStream = Array.from(callState.remoteStreams.values())[0];
+                if (remoteStream && audio.srcObject !== remoteStream) {
+                  audio.srcObject = remoteStream;
+                }
+              }
+            }}
+          />
         )}
 
         {/* Call Status Overlay */}

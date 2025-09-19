@@ -1,47 +1,60 @@
-// WebRTC and Call related types
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  avatarUrl: string;
+  isOnline: boolean;
+}
+
+export interface Message {
+  id: string;
+  chatId: string;
+  senderId: string;
+  content: string;
+  timestamp: string;
+  type: 'text' | 'voice' | 'image' | 'file' | 'call_history';
+  isRead: boolean;
+  isDelivered: boolean;
+}
+
+export interface Chat {
+  id: string;
+  userIds: string[];
+  users: User[];
+  messages: Message[];
+  lastMessage?: Message;
+  lastMessageAt?: string;
+  unreadCount: number;
+}
+
+export interface ConnectionRequest {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  fromUser: User;
+  toUser: User;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: string;
+  message?: string;
+}
+
 export interface Call {
   id: string;
   type: 'audio' | 'video';
-  participants: string[];
-  status: 'initiating' | 'ringing' | 'connected' | 'ended' | 'failed';
+  status: CallStatus;
+  from: User;
+  to: User;
   startTime?: Date;
   endTime?: Date;
   duration?: number;
+  participants: string[]; // Array of user IDs participating in the call
 }
 
-export interface WebRTCConfig {
-  iceServers: RTCIceServer[];
-  mediaConstraints: MediaStreamConstraints;
+export enum CallStatus {
+  IDLE = 'idle',
+  RINGING = 'ringing',
+  ACTIVE = 'active',
+  REJECTED = 'rejected',
+  ENDED = 'ended'
 }
-
-export interface CallState {
-  isInCall: boolean;
-  callType: 'audio' | 'video' | null;
-  participants: string[];
-  localStream: MediaStream | null;
-  remoteStreams: Map<string, MediaStream>;
-  connectionStatus: 'connecting' | 'connected' | 'disconnected';
-  isAudioEnabled: boolean;
-  isVideoEnabled: boolean;
-  isScreenSharing: boolean;
-  isSpeakerOn: boolean;
-  callDuration: number;
-  error: string | null;
-}
-
-export interface SignalingMessage {
-  type: 'call_initiate' | 'call_accept' | 'call_reject' | 'call_end' | 'ice_candidate' | 'offer' | 'answer';
-  from: string;
-  to: string;
-  data?: any;
-  callId?: string;
-}
-
-export interface MediaConstraints {
-  audio: boolean | MediaTrackConstraints;
-  video: boolean | MediaTrackConstraints;
-}
-
-// Re-export existing types
-export type { User } from '../contexts/AuthContext.types';
-export type { UserRole } from '../contexts/AuthContext.types';

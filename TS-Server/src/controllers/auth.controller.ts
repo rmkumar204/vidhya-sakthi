@@ -2,11 +2,122 @@ import asyncHandler from 'express-async-handler';
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import User, { IUser } from '../models/user.model';
+import Otp, { IOtp } from '../models/otp.model';
 import generateToken from '../utils/generateToken';
 import { EmailPasswordRegisterSchema, EmailPasswordLoginSchema, UserRegistrationSchema } from '../shared/types';
 import { Types } from 'mongoose';
 import { getGoogleOAuthTokens, getGoogleUser } from '../services/google.service';
- 
+import { sendOtpEmail } from '../services/mail.service';
+
+export const checkUser = asyncHandler(async (req: Request, res: Response) => {
+  const email = String(req.query.email || '').toLowerCase();
+  if (!email) {
+    res.status(400);
+    throw new Error('Email is required');
+  }
+  const user = await User.findOne({ email }).select('_id').lean();
+  res.json({ exists: !!user });
+});
+
+export const sendOtp = asyncHandler(async (req: Request, res: Response) => {
+  const { email, purpose } = req.body as { email?: string; purpose?: 'register' | 'reset' };
+  if (!email || !purpose) {
+    res.status(400);
+    throw new Error('Email and purpose are required');
+  }
+  const normalized = email.toLowerCase();
+  const otp = (Math.floor(100000 + Math.random() * 900000)).toString();
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes from now
+  
+  try {
+    // Delete any existing OTP for this email and purpose
+    await Otp.deleteMany({ email: normalized, purpose });
+    
+    // Create new OTP record
+    await Otp.create({
+      email: normalized,
+      otp,
+      purpose,
+      expiresAt
+    });
+    
+    await sendOtpEmail(normalized, otp, purpose);
+    res.json({ message: 'OTP sent', ttlSeconds: 300 });
+  } catch (e) {
+    // Clean up OTP record if email sending fails
+    await Otp.deleteMany({ email: normalized, purpose });
+    res.status(500);
+    throw new Error('Failed to send OTP email');
+  }
+});
+
+export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
+  const { email, otp, purpose } = req.body as { email?: string; otp?: string; purpose?: 'register' | 'reset' };
+  if (!email || !otp) {
+    res.status(400);
+    throw new Error('Email and OTP are required');
+  }
+  const normalized = email.toLowerCase();
+  
+  // Find the OTP record in MongoDB
+  const otpRecord = await Otp.findOne({ 
+    email: normalized, 
+    otp,
+    expiresAt: { $gt: new Date() } // Only find non-expired OTPs
+  });
+  
+  if (!otpRecord) {
+    res.status(400);
+    throw new Error('Invalid or expired OTP');
+  }
+  
+  if (purpose && otpRecord.purpose !== purpose) {
+    res.status(400);
+    throw new Error('OTP purpose mismatch');
+  }
+  
+  // Only delete OTP for register purpose, keep it for reset purpose until password is actually reset
+  if (otpRecord.purpose === 'register') {
+    await Otp.deleteOne({ _id: otpRecord._id });
+  }
+  
+  res.json({ verified: true });
+});
+
+export const resetPassword = asyncHandler(async (req: Request, res: Response) => {
+  const { email, otp, newPassword } = req.body as { email?: string; otp?: string; newPassword?: string };
+  if (!email || !otp || !newPassword) {
+    res.status(400);
+    throw new Error('Email, OTP and newPassword are required');
+  }
+  const normalized = email.toLowerCase();
+  
+  // Find the OTP record in MongoDB (without expiry check since OTP should already be verified)
+  const otpRecord = await Otp.findOne({ 
+    email: normalized, 
+    otp: String(otp),
+    purpose: 'reset'
+  });
+  
+  if (!otpRecord) {
+    res.status(400);
+    throw new Error('Invalid OTP for password reset');
+  }
+  
+  const user = await User.findOne({ email: normalized }).exec() as IUser | null;
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+  
+  user.password_hash = newPassword; // pre-save hook hashes
+  await user.save();
+  
+  // Delete the OTP after successful password reset
+  await Otp.deleteOne({ _id: otpRecord._id });
+  
+  res.json({ message: 'Password reset successful' });
+});
 /**
  * @desc    Register a new user with email/password
  * @route   POST /api/auth/register

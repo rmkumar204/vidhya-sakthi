@@ -450,12 +450,12 @@ export default function Messages() {
   };
 
   const handleEndCall = () => {
-    console.log('Messages: handleEndCall called');
+    // End call and cleanup
     setActiveCall(null);
   };
 
   const handleCloseCallModal = () => {
-    console.log('Messages: handleCloseCallModal called');
+    // Close modal and cleanup
     setActiveCall(null);
   };
 

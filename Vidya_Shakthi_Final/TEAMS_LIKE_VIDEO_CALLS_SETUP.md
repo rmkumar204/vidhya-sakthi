@@ -37,7 +37,7 @@ npm install
 npm start
 ```
 
-The server will start on `http://localhost:8080`
+The server will start on `http://localhost:1883`
 
 ### 2. Start the React App
 
@@ -179,8 +179,8 @@ console.log('WebSocket ready state:', webSocketService.ws?.readyState);
 ### Common Issues
 
 #### 1. "WebSocket connection failed"
-- **Solution**: Ensure signaling server is running on port 8080
-- **Check**: `http://localhost:8080` should be accessible
+- **Solution**: Ensure signaling server is running on port 1883
+- **Check**: `http://localhost:1883` should be accessible
 
 #### 2. "Camera/microphone access denied"
 - **Solution**: Allow permissions in browser
@@ -257,7 +257,7 @@ console.log('WebSocket ready state:', webSocketService.ws?.readyState);
 
 ```bash
 # Signaling Server
-PORT=8080
+PORT=1883
 NODE_ENV=development
 
 # WebRTC Configuration

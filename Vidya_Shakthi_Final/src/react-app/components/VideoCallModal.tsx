@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import toast from 'react-hot-toast';
 import { Call, User } from '../types';
 import { formatDuration } from '../utils/formatters';
 import { useWebRTC } from '../hooks/useWebRTC';
@@ -105,7 +106,7 @@ export const VideoCallModal: React.FC<VideoCallModalProps> = ({
         {/* Close button */}
         <button
           onClick={() => {
-            console.log('VideoCallModal: Close button clicked...');
+            // Close modal and cleanup
             handleEndCall();
             onClose();
           }}

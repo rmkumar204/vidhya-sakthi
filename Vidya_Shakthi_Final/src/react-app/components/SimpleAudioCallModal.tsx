@@ -7,13 +7,16 @@ interface SimpleAudioCallModalProps {
   user: User;
   onEndCall: () => void;
   onClose: () => void;
+  onAccept?: () => void;
+  onReject?: () => void;
 }
 
 export const SimpleAudioCallModal: React.FC<SimpleAudioCallModalProps> = ({
   call,
-  user,
   onEndCall,
-  onClose
+  onClose,
+  onAccept,
+  onReject
 }) => {
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -26,7 +29,6 @@ export const SimpleAudioCallModal: React.FC<SimpleAudioCallModalProps> = ({
     startAudioCall, 
     acceptCall,
     rejectCall,
-    endCall, 
     forceCleanup, 
     toggleAudio,
     toggleSpeaker
@@ -93,42 +95,40 @@ export const SimpleAudioCallModal: React.FC<SimpleAudioCallModalProps> = ({
   if (incomingCall) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-8 max-w-md w-full mx-4">
-          <div className="text-center">
-            <div className="mb-6">
-              <div className="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                </svg>
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                Incoming {incomingCall.callType} call
-              </h2>
-              <p className="text-gray-600 dark:text-gray-300">
-                {incomingCall.from} is calling you
-              </p>
+        <div className="bg-slate-800 rounded-lg p-8 max-w-md w-full mx-4 text-center">
+          <div className="mb-6">
+            <div className="w-20 h-20 rounded-full bg-slate-600 flex items-center justify-center mx-auto mb-4">
+              <span className="text-white font-bold text-2xl">
+                {incomingCall.from ? incomingCall.from.charAt(0).toUpperCase() : 'U'}
+              </span>
             </div>
+            <h2 className="text-2xl font-bold text-white mb-2">
+              Incoming {incomingCall.callType} call
+            </h2>
+            <p className="text-slate-400">
+              {incomingCall.from || 'Unknown User'} is calling you
+            </p>
+          </div>
 
-            <div className="flex justify-center space-x-4">
-              <button
-                onClick={rejectCall}
-                className="bg-red-500 hover:bg-red-600 text-white p-4 rounded-full transition-colors"
-                title="Decline call"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-              <button
-                onClick={acceptCall}
-                className="bg-green-500 hover:bg-green-600 text-white p-4 rounded-full transition-colors"
-                title="Accept call"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </button>
-            </div>
+          <div className="flex justify-center space-x-4">
+            <button
+              onClick={onReject || rejectCall}
+              className="flex items-center justify-center w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors"
+              title="Decline call"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <button
+              onClick={onAccept || acceptCall}
+              className="flex items-center justify-center w-16 h-16 rounded-full bg-green-500 hover:bg-green-600 text-white transition-colors"
+              title="Accept call"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
@@ -188,12 +188,18 @@ export const SimpleAudioCallModal: React.FC<SimpleAudioCallModalProps> = ({
           <div className={`bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center shadow-2xl mx-auto mb-6 ${
             isMaximized ? 'w-80 h-80' : 'w-48 h-48'
           }`}>
-            <span className={`font-bold text-white ${isMaximized ? 'text-8xl' : 'text-5xl'}`}>👤</span>
+            <span className={`font-bold text-white ${isMaximized ? 'text-8xl' : 'text-5xl'}`}>
+              {(call.to?.name || call.from?.name || 'U').charAt(0).toUpperCase()}
+            </span>
           </div>
-          <h2 className={`font-semibold text-white mb-2 ${isMaximized ? 'text-4xl' : 'text-xl'}`}>
-            {call.participants[0] || 'Remote Participant'}
+          <h2 className={`font-semibold text-white mb-1 ${isMaximized ? 'text-4xl' : 'text-xl'}`}>
+            {call.to?.name || call.from?.name || 'Unknown User'}
           </h2>
-          <p className={`text-gray-300 ${isMaximized ? 'text-xl' : 'text-sm'}`}>Audio Call</p>
+          <p className={`text-gray-300 ${isMaximized ? 'text-xl' : 'text-sm mb-2'}`}>Audio Call</p>
+          <div className="flex items-center justify-center space-x-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <span className="text-gray-400 text-xs">Online</span>
+          </div>
         </div>
 
         {/* Call Status Overlay */}

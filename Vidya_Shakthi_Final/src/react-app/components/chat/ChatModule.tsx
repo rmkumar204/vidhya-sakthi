@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Users, MessageCircle, Paperclip, Clock, X } from 'lucide-react';
+import toast from 'react-hot-toast';
 import MessageInput from '../MessageInput';
 import TypingIndicator from '../TypingIndicator';
 
@@ -70,6 +71,7 @@ export default function ChatModule({ userId }: ChatModuleProps) {
       }
     } catch (error) {
       console.error('Failed to fetch chat rooms:', error);
+      toast.error('Failed to load chat rooms');
     }
   };
 
@@ -83,6 +85,7 @@ export default function ChatModule({ userId }: ChatModuleProps) {
       }
     } catch (error) {
       console.error('Failed to fetch messages:', error);
+      toast.error('Failed to load messages');
     } finally {
       setIsLoading(false);
     }
@@ -113,11 +116,12 @@ export default function ChatModule({ userId }: ChatModuleProps) {
       }
     } catch (error) {
       console.error('Failed to send message:', error);
+      toast.error('Failed to send message');
     }
   };
 
   const handleScheduleMessage = (messageText: string, files: File[] | undefined, scheduledFor: Date) => {
-    console.log('Scheduling message:', { messageText, files, scheduledFor });
+    // Schedule message for later sending
     const messageId = Date.now().toString();
     
     // Schedule the actual sending
@@ -142,7 +146,7 @@ export default function ChatModule({ userId }: ChatModuleProps) {
     
     setScheduledMessages(prev => {
       const newMessages = [...prev, scheduledMessage];
-      console.log('Updated scheduled messages:', newMessages);
+      toast.success(`Message scheduled for ${scheduledFor.toLocaleString()}`);
       return newMessages;
     });
   };

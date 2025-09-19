@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import toast from 'react-hot-toast';
 import { Call, User } from '../types';
 import { formatDuration } from '../utils/formatters';
 import { useWebRTC } from '../hooks/useWebRTC';
@@ -36,13 +37,13 @@ export const AudioCallModal: React.FC<AudioCallModalProps> = ({
     startCall();
 
     return () => {
-      console.log('AudioCallModal: useEffect cleanup - ending call...');
+      // Cleanup call components
       forceCleanup();
     };
   }, [call.participants, startAudioCall, forceCleanup]);
 
   const handleEndCall = () => {
-    console.log('AudioCallModal: Ending call...');
+    // End call and cleanup
     forceCleanup();
     onEndCall();
   };

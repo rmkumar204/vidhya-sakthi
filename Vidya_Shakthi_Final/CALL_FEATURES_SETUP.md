@@ -57,7 +57,7 @@ This guide explains how to set up and test the comprehensive call features imple
 cd server
 node server.js
 ```
-The server will start on port 1883.
+The server will start on port 8080.
 
 ### 2. Start the Frontend
 ```bash

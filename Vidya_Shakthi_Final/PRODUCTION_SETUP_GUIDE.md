@@ -113,14 +113,14 @@ git push heroku main
 1. Connect your GitHub repository
 2. Set build command: `npm install`
 3. Set run command: `node server.js`
-4. Set port: `1883`
+4. Set port: `8080`
 
 ### 2.3 Environment Variables
 
 Set these environment variables in your hosting platform:
 
 ```bash
-PORT=1883
+PORT=8080
 NODE_ENV=production
 ```
 
@@ -146,7 +146,7 @@ After deploying your WebSocket server, update the frontend:
 // src/react-app/services/WebSocketService.ts
 const serverUrl = process.env.NODE_ENV === 'production' 
   ? 'wss://your-signaling-server.railway.app'  // Your production URL
-  : 'ws://localhost:1883';  // Development URL
+  : 'ws://localhost:8080';  // Development URL
 
 export const webSocketService = new WebSocketService(serverUrl);
 ```

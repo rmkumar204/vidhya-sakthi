@@ -91,6 +91,7 @@ export class WebSocketService {
 
         this.ws.onmessage = (event) => {
           try {
+            console.log("========================================= ws message");
             const message: WebSocketMessage = JSON.parse(event.data);
             this.handleMessage(message);
           } catch (error) {
@@ -145,12 +146,36 @@ export class WebSocketService {
   }
 
   private handleMessage(message: WebSocketMessage) {
+    console.log("========================================= handleMessage");
     console.log('📨 WebSocket received message:', message);
+    
+    // Enhanced debugging for call_end messages
+    if (message.type === 'call_end') {
+      console.log('🔴 ❗ CALL_END MESSAGE RECEIVED:', {
+        type: message.type,
+        payload: message.payload,
+        from: message.from,
+        to: message.to,
+        timestamp: message.timestamp,
+        currentUserId: this.currentUserId
+      });
+    }
+    
     const listeners = this.listeners.get(message.type) || [];
     console.log(`🎯 Found ${listeners.length} listeners for type '${message.type}'`);
-    listeners.forEach(listener => {
-      console.log('🔄 Calling listener with payload:', message.payload);
-      listener(message.payload);
+    
+    if (listeners.length === 0) {
+      console.warn(`⚠️ No listeners registered for message type '${message.type}' - message will be ignored!`);
+    }
+    
+    listeners.forEach((listener, index) => {
+      console.log(`🔄 Calling listener ${index + 1}/${listeners.length} with payload:`, message.payload);
+      try {
+        listener(message.payload);
+        console.log(`✅ Listener ${index + 1} executed successfully`);
+      } catch (error) {
+        console.error(`❌ Error in listener ${index + 1}:`, error);
+      }
     });
   }
 
@@ -217,6 +242,8 @@ export class WebSocketService {
   }
 
   sendCallEnd(to: string) {
+    console.log("📞 Call end message sent ------------------------->");
+    
     // Throttle call_end messages to prevent infinite loops
     const now = Date.now();
     const lastSent = this.callEndThrottle.get(to) || 0;
@@ -228,6 +255,24 @@ export class WebSocketService {
     
     this.callEndThrottle.set(to, now);
     console.log('📤 Sending throttled call_end to:', to);
+    
+    // Enhanced debugging for call_end message structure
+    const message = {
+      type: 'call_end' as any,
+      payload: {},
+      from: this.currentUserId || undefined,
+      to,
+      timestamp: Date.now()
+    };
+    
+    console.log('🔍 Call_end message structure:', {
+      messageType: message.type,
+      fromUser: message.from,
+      toUser: message.to,
+      payload: message.payload,
+      timestamp: message.timestamp
+    });
+    
     this.sendMessage('call_end', {}, to);
     
     // Clean up old throttle entries

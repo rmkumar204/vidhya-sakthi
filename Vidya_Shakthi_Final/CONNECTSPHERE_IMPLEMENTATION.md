@@ -200,11 +200,11 @@ const handleToggleScreenShare = async () => {
 ### **Environment Variables**
 ```bash
 # Server
-PORT=1883
+PORT=8080
 NODE_ENV=production
 
 # Client
-VITE_WS_URL=wss://your-domain.com:1883
+VITE_WS_URL=wss://your-domain.com:8080
 VITE_STUN_SERVERS=stun:stun.l.google.com:19302
 ```
 

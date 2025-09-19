@@ -208,7 +208,7 @@ export class RealTimeConversationService {
   connect(conversationId: string): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        const wsUrl = `ws://localhost:1883?userId=${this.userId}&conversationId=${conversationId}&token=${this.token}`;
+        const wsUrl = `ws://localhost:8080?userId=${this.userId}&conversationId=${conversationId}&token=${this.token}`;
         this.ws = new WebSocket(wsUrl);
         
         this.ws.onopen = () => {

@@ -2,7 +2,7 @@
 const WebSocket = require('ws');
 
 class ProductionSystemTester {
-  constructor(serverUrl = 'ws://localhost:1883') {
+  constructor(serverUrl = 'ws://localhost:8080') {
     this.serverUrl = serverUrl;
     this.clients = [];
     this.testResults = [];

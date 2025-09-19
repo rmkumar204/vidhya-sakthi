@@ -2,7 +2,7 @@ const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
 
 class SignalingServer {
-  constructor(port = 1883) {
+  constructor(port = 8080) {
     this.port = port;
     this.clients = new Map(); // userId -> WebSocket
     this.chats = new Map(); // chatId -> Set of userIds
@@ -550,7 +550,7 @@ class SignalingServer {
 }
 
 // Start the server
-const server = new SignalingServer(process.env.PORT || 1883);
+const server = new SignalingServer(process.env.PORT || 8080);
 
 // Graceful shutdown
 process.on('SIGTERM', () => {

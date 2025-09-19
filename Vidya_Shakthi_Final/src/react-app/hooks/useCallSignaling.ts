@@ -24,29 +24,47 @@ const useCallSignaling = (currentUser: User | null) => {
     // Setup WebSocket listeners for incoming calls
     const handleIncomingCall = (data: any) => {
       if (currentUser && currentUser.id && data.callType) {
+        // Create a proper User object from the incoming data
+        const fromUser: User = {
+          id: data.fromUserId,
+          name: data.fromUserName || `User ${data.fromUserId.slice(-4)}`,
+          email: '', // Not provided in call offer
+          role: '', // Not provided in call offer
+          avatarUrl: '', // Not provided in call offer
+          isOnline: true
+        };
+        
         const incomingCall: Call = {
           id: `call-${Date.now()}`,
-          from: data.from,
+          from: fromUser,
           to: currentUser,
           type: data.callType,
           status: CallStatus.RINGING,
-          participants: [data.from.id, currentUser.id]
+          participants: [data.fromUserId, currentUser.id]
         };
         setCall(incomingCall);
         updateCallState(incomingCall);
       }
     };
 
-    const handleCallEnd = () => {
+    const handleCallEnd = (data: any) => {
+      console.log('🔴 ❗ useCallSignaling: Call end signal received via WebSocket:', data);
+      
       if (isHandlingCallEnd) {
         console.log('⚠️ Call end already being handled, ignoring duplicate');
         return;
       }
       
       setIsHandlingCallEnd(true);
-      console.log('📞 Call end signal received via WebSocket');
+      console.log('📞 useCallSignaling: Processing call end signal');
       
       // Clear local call state immediately
+      console.log('🧠 Clearing call state:', {
+        currentCall: call?.id,
+        localStreamActive: !!localStream,
+        remoteStreamActive: !!remoteStream
+      });
+      
       setCall(null);
       setLocalStream(null);
       setRemoteStream(null);
@@ -64,6 +82,7 @@ const useCallSignaling = (currentUser: User | null) => {
       // Reset the flag after a delay
       setTimeout(() => {
         setIsHandlingCallEnd(false);
+        console.log('🔄 Call end handling flag reset');
       }, 500);
     };
 

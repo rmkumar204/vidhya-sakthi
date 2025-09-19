@@ -1,721 +1,723 @@
 const WebSocket = require('ws');
-const http = require('http');
-const url = require('url');
+const { v4: uuidv4 } = require('uuid');
 
 class SignalingServer {
-  constructor(port = 1883) {
+  constructor(port = 8080) {
     this.port = port;
     this.clients = new Map(); // userId -> WebSocket
     this.chats = new Map(); // chatId -> Set of userIds
-    this.callEndThrottle = new Map(); // Prevent spam
-    this.messageHistory = new Map(); // chatId -> message history
-    this.userStatus = new Map(); // userId -> { online: boolean, lastSeen: Date }
-    
+    this.callEndThrottle = new Map(); // userId -> timestamp to prevent spam
     this.setupServer();
   }
 
   setupServer() {
-    // Create HTTP server for CORS handling
-    this.server = http.createServer((req, res) => {
-      // Handle CORS
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-      
-      if (req.method === 'OPTIONS') {
-        res.writeHead(200);
-        res.end();
-        return;
-      }
-      
-      // Health check endpoint
-      if (req.url === '/health') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          status: 'healthy',
-          clients: this.clients.size,
-          chats: this.chats.size,
-          uptime: process.uptime()
-        }));
-        return;
-      }
-      
-      res.writeHead(404);
-      res.end('Not Found');
-    });
-
-    // Create WebSocket server
     this.wss = new WebSocket.Server({ 
-      server: this.server,
+      port: this.port,
       verifyClient: (info) => {
-        // Allow all connections for now, but could add authentication here
-        return true;
-      }
+        // Allow CORS from any origin for development
+        const origin = info.origin;
+        console.log('WebSocket connection attempt from origin:', origin);
+        return true; // Accept all origins for development
+      },
+      // Add additional server options for better cross-browser compatibility
+      perMessageDeflate: false,
+      maxPayload: 16 * 1024 * 1024, // 16MB
+      clientTracking: true
     });
 
     this.wss.on('connection', (ws, req) => {
-      console.log('🔌 New WebSocket connection');
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      const userId = url.searchParams.get('userId');
       
+      if (!userId) {
+        ws.close(1008, 'User ID required');
+        return;
+      }
+
+      console.log(`User ${userId} connected`);
+      this.clients.set(userId, ws);
+      console.log(`📋 Total connected users: ${this.clients.size}`, Array.from(this.clients.keys()));
+
+      // Send connection confirmation
+      ws.send(JSON.stringify({
+        type: 'connection_established',
+        payload: { userId }
+      }));
+
       ws.on('message', (data) => {
         try {
+          console.log("========================================= ws message");
           const message = JSON.parse(data.toString());
-          this.handleMessage(ws, message);
+          console.log(`📨 Received message from ${userId}:`, message);
+          this.handleMessage(userId, message);
         } catch (error) {
-          console.error('❌ Invalid message format:', error);
-          this.sendError(ws, 'Invalid message format');
+          console.error('Error parsing message:', error);
         }
       });
 
       ws.on('close', () => {
-        this.handleDisconnection(ws);
+        console.log(`User ${userId} disconnected`);
+        this.clients.delete(userId);
+        console.log(`📋 Remaining connected users: ${this.clients.size}`, Array.from(this.clients.keys()));
+        this.broadcastUserLeft(userId);
       });
 
       ws.on('error', (error) => {
-        console.error('❌ WebSocket error:', error);
-        this.handleDisconnection(ws);
+        console.error(`WebSocket error for user ${userId}:`, error);
       });
+
+      // Broadcast user joined
+      this.broadcastUserJoined(userId);
     });
 
-    this.server.listen(this.port, () => {
-      console.log(`🚀 Signaling server running on port ${this.port}`);
-      console.log(`📡 WebSocket endpoint: ws://localhost:${this.port}`);
-      console.log(`🏥 Health check: http://localhost:${this.port}/health`);
-    });
+    console.log(`Signaling server running on port ${this.port}`);
   }
 
-  handleMessage(ws, message) {
-    const { type, payload, from, to } = message;
+  handleMessage(fromUserId, message) {
     
-    console.log(`📨 Received ${type} from ${from || 'unknown'}`);
+    console.log("=========================================handleMessage");
+    const { type, payload, to } = message;
+    console.log("=========================================handleMessage", type);
+
+    // Store the 'to' field for use in handlers
+    this.currentMessageTo = to;
 
     switch (type) {
-      case 'user_join':
-        this.handleUserJoin(ws, payload);
-        break;
       case 'message':
-        this.handleChatMessage(ws, payload);
-        break;
-      case 'call_offer':
-        this.handleCallOffer(ws, payload);
-        break;
-      case 'call_answer':
-        this.handleCallAnswer(ws, payload);
-        break;
-      case 'call_ice_candidate':
-        this.handleIceCandidate(ws, payload);
-        break;
-      case 'call_end':
-        this.handleCallEnd(ws, payload);
+        this.handleChatMessage(fromUserId, payload);
         break;
       case 'typing':
-        this.handleTypingIndicator(ws, payload);
+        this.handleTypingIndicator(fromUserId, payload);
         break;
-      case 'call_mute_status':
-        this.handleMuteStatus(ws, payload);
+      case 'message_read':
+        this.handleMessageRead(fromUserId, payload);
         break;
-      case 'call_video_status':
-        this.handleVideoStatus(ws, payload);
+      case 'call_initiate':
+        this.handleCallInitiate(fromUserId, payload);
         break;
-      case 'call_ringing':
-        this.handleCallRinging(ws, payload);
+      case 'call_accept':
+        this.handleCallAccept(fromUserId, payload);
         break;
       case 'call_reject':
-        this.handleCallReject(ws, payload);
+        this.handleCallReject(fromUserId, payload);
+        break;
+      case 'call_end':
+        this.handleCallEnd(fromUserId, payload);
+        break;
+      case 'offer':
+      case 'call_offer':
+        this.handleCallOffer(fromUserId, payload);
+        break;
+      case 'answer':
+      case 'call_answer':
+        this.handleCallAnswer(fromUserId, payload);
+        break;
+      case 'ice_candidate':
+      case 'call_ice_candidate':
+        this.handleIceCandidate(fromUserId, payload);
+        break;
+      case 'call_reject':
+        this.handleCallReject(fromUserId, payload);
+        break;
+      case 'call_ringing':
+        this.handleCallRinging(fromUserId, payload);
+        break;
+      case 'call_mute_status':
+        this.handleCallMuteStatus(fromUserId, payload);
+        break;
+      case 'call_video_status':
+        this.handleCallVideoStatus(fromUserId, payload);
         break;
       case 'call_history':
-        this.handleCallHistory(ws, payload);
+        this.handleCallHistory(fromUserId, payload);
+        break;
+      case 'connection_request':
+        this.handleConnectionRequest(fromUserId, payload);
+        break;
+      case 'connection_accept':
+        this.handleConnectionAccept(fromUserId, payload);
+        break;
+      case 'connection_reject':
+        this.handleConnectionReject(fromUserId, payload);
+        break;
+      case 'ping':
+        this.handlePing(fromUserId, payload);
         break;
       case 'scheduled_message':
-        this.handleScheduledMessage(ws, payload);
+        this.handleScheduledMessage(fromUserId, payload);
         break;
       default:
-        console.warn(`⚠️ Unknown message type: ${type}`);
-        this.sendError(ws, `Unknown message type: ${type}`);
+        console.log(`⚠️ Unknown message type: ${type}`);
     }
   }
 
-  handleUserJoin(ws, payload) {
-    const { userId, userName } = payload;
+  handleChatMessage(fromUserId, payload) {
+    console.log(`💬 Handling chat message from ${fromUserId}:`, payload);
+    const { chatId, content, type, senderId, senderName } = payload;
     
-    if (!userId) {
-      this.sendError(ws, 'User ID is required');
-      return;
-    }
-
-    // Store client connection
-    this.clients.set(userId, ws);
-    this.userStatus.set(userId, { 
-      online: true, 
-      lastSeen: new Date(),
-      userName: userName || `User ${userId.slice(-4)}`
-    });
-
-    // Store user ID in WebSocket for easy access
-    ws.userId = userId;
-    ws.userName = userName || `User ${userId.slice(-4)}`;
-
-    console.log(`✅ User ${userId} joined (${this.clients.size} total users)`);
-
-    // Send confirmation
-    this.sendMessage(ws, {
-      type: 'user_joined',
-      payload: { userId, status: 'connected' }
-    });
-
-    // Broadcast user online status to all connected users
-    this.broadcastUserStatus(userId, true);
-  }
-
-  handleChatMessage(ws, payload) {
-    const { chatId, content, type = 'text', senderId, senderName } = payload;
-    
-    if (!chatId || !content || !senderId) {
-      this.sendError(ws, 'Chat ID, content, and sender ID are required');
-      return;
-    }
-
-    // Create message object
+    // Create message with server timestamp and unique ID
+    const uniqueId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${fromUserId}`;
     const message = {
-      id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: uniqueId,
       chatId,
+      senderId: fromUserId,
+      senderName: senderName || `User ${fromUserId.substr(-4)}`,
       content,
-      type,
-      senderId,
-      senderName: senderName || ws.userName || `User ${senderId.slice(-4)}`,
-      timestamp: new Date().toISOString(),
-      delivered: false
+      type: type || 'text',
+      timestamp: new Date().toISOString()
     };
 
-    // Store message in history
-    if (!this.messageHistory.has(chatId)) {
-      this.messageHistory.set(chatId, []);
-    }
-    this.messageHistory.get(chatId).push(message);
+    console.log(`📤 Broadcasting message to chat ${chatId}:`, message);
+    // Broadcast to all users in the chat
+    this.broadcastToChatMembers(chatId, fromUserId, {
+      type: 'message',
+      payload: message
+    });
+  }
 
-    // Get chat participants
-    const participants = this.chats.get(chatId) || new Set();
+  handleTypingIndicator(fromUserId, payload) {
+    const { chatId, isTyping } = payload;
     
-    // If this is a new chat, add the sender
-    if (participants.size === 0) {
-      participants.add(senderId);
-      this.chats.set(chatId, participants);
-    }
+    console.log(`⌨️ Typing indicator from ${fromUserId} in chat ${chatId}: ${isTyping}`);
+    
+    // Broadcast typing indicator to other chat members
+    this.broadcastToChatMembers(chatId, fromUserId, {
+      type: 'typing',
+      payload: {
+        chatId,
+        userId: fromUserId,
+        isTyping
+      }
+    });
+  }
 
-    // Send message to all participants except sender
-    participants.forEach(userId => {
-      if (userId !== senderId) {
-        const client = this.clients.get(userId);
-        if (client && client.readyState === WebSocket.OPEN) {
-          this.sendMessage(client, {
-            type: 'message',
-            payload: message
-          });
+  handleMessageRead(fromUserId, payload) {
+    const { chatId, messageId } = payload;
+    
+    // Broadcast read receipt to other chat members
+    this.broadcastToChatMembers(chatId, fromUserId, {
+      type: 'message_read',
+      payload: {
+        chatId,
+        messageId,
+        userId: fromUserId,
+        timestamp: new Date().toISOString()
+      }
+    });
+  }
+
+  handleCallInitiate(fromUserId, payload) {
+    const { callId, callType, targetUserId, roomId } = payload;
+    
+    const targetClient = this.clients.get(targetUserId);
+    if (targetClient && targetClient.readyState === WebSocket.OPEN) {
+      targetClient.send(JSON.stringify({
+        type: 'call_initiate',
+        payload: {
+          callId,
+          callType,
+          fromUserId,
+          fromUserName: `User ${fromUserId.substr(-4)}`, // In production, fetch from user service
+          roomId,
+          timestamp: new Date().toISOString()
         }
-      }
-    });
-
-    // Send delivery confirmation to sender
-    this.sendMessage(ws, {
-      type: 'message_delivered',
-      payload: { messageId: message.id, chatId }
-    });
-
-    console.log(`💬 Message sent in chat ${chatId} by ${senderId}`);
+      }));
+    }
   }
 
-  handleCallOffer(ws, payload) {
-    const { callId, toUserId, offer, callType, fromUserId, fromUserName } = payload;
+  handleCallAccept(fromUserId, payload) {
+    const { callId, targetUserId } = payload;
     
-    if (!callId || !toUserId || !offer || !callType) {
-      this.sendError(ws, 'Call ID, target user, offer, and call type are required');
-      return;
+    const targetClient = this.clients.get(targetUserId);
+    if (targetClient && targetClient.readyState === WebSocket.OPEN) {
+      targetClient.send(JSON.stringify({
+        type: 'call_accept',
+        payload: {
+          callId,
+          fromUserId,
+          timestamp: new Date().toISOString()
+        }
+      }));
     }
-
-    const targetClient = this.clients.get(toUserId);
-    if (!targetClient || targetClient.readyState !== WebSocket.OPEN) {
-      this.sendError(ws, 'Target user is not available');
-      return;
-    }
-
-    // Send call offer to target user
-    this.sendMessage(targetClient, {
-      type: 'call_offer',
-      payload: {
-        callId,
-        fromUserId: fromUserId || ws.userId,
-        fromUserName: fromUserName || ws.userName,
-        offer,
-        callType,
-        timestamp: new Date().toISOString()
-      }
-    });
-
-    console.log(`📞 Call offer sent from ${ws.userId} to ${toUserId}`);
   }
 
-  handleCallAnswer(ws, payload) {
-    const { callId, fromUserId, answer } = payload;
+  handleCallReject(fromUserId, payload) {
+    const { callId, targetUserId } = payload;
     
-    if (!callId || !fromUserId || !answer) {
-      this.sendError(ws, 'Call ID, from user ID, and answer are required');
-      return;
+    const targetClient = this.clients.get(targetUserId);
+    if (targetClient && targetClient.readyState === WebSocket.OPEN) {
+      targetClient.send(JSON.stringify({
+        type: 'call_reject',
+        payload: {
+          callId,
+          fromUserId,
+          timestamp: new Date().toISOString()
+        }
+      }));
     }
-
-    const targetClient = this.clients.get(fromUserId);
-    if (!targetClient || targetClient.readyState !== WebSocket.OPEN) {
-      this.sendError(ws, 'Caller is not available');
-      return;
-    }
-
-    // Send answer back to caller
-    this.sendMessage(targetClient, {
-      type: 'call_answer',
-      payload: {
-        callId,
-        fromUserId: ws.userId,
-        answer,
-        timestamp: new Date().toISOString()
-      }
-    });
-
-    // Also send call_accepted event for UI updates
-    this.sendMessage(targetClient, {
-      type: 'call_accepted',
-      payload: {
-        callId,
-        fromUserId: ws.userId,
-        timestamp: new Date().toISOString()
-      }
-    });
-
-    console.log(`📞 Call answer sent from ${ws.userId} to ${fromUserId}`);
   }
 
-  handleCallReject(ws, payload) {
-    const { callId, toUserId, fromUserId } = payload;
+  handleConnectionRequest(fromUserId, payload) {
+    const { connectionId, mentorId, menteeId, projectId } = payload;
     
-    if (!callId || !toUserId) {
-      this.sendError(ws, 'Call ID and to user ID are required');
-      return;
+    // Determine target user (the one who didn't send the request)
+    const targetUserId = fromUserId === mentorId ? menteeId : mentorId;
+    
+    const targetClient = this.clients.get(targetUserId);
+    if (targetClient && targetClient.readyState === WebSocket.OPEN) {
+      targetClient.send(JSON.stringify({
+        type: 'connection_request',
+        payload: {
+          connectionId,
+          mentorId,
+          menteeId,
+          mentorName: `Mentor ${mentorId.substr(-4)}`,
+          menteeName: `Mentee ${menteeId.substr(-4)}`,
+          projectId,
+          projectName: projectId ? `Project ${projectId.substr(-4)}` : undefined,
+          timestamp: new Date().toISOString()
+        }
+      }));
     }
-
-    const targetClient = this.clients.get(toUserId);
-    if (!targetClient || targetClient.readyState !== WebSocket.OPEN) {
-      this.sendError(ws, 'Caller is not available');
-      return;
-    }
-
-    // Send reject notification back to caller
-    this.sendMessage(targetClient, {
-      type: 'call_rejected',
-      payload: {
-        callId,
-        fromUserId: ws.userId,
-        timestamp: new Date().toISOString()
-      }
-    });
-
-    // Also send call_end to both users to close their modals
-    this.sendMessage(targetClient, {
-      type: 'call_end',
-      payload: {
-        callId,
-        fromUserId: ws.userId,
-        timestamp: new Date().toISOString()
-      }
-    });
-
-    // Send call_end to the rejecter as well
-    this.sendMessage(ws, {
-      type: 'call_end',
-      payload: {
-        callId,
-        fromUserId: ws.userId,
-        timestamp: new Date().toISOString()
-      }
-    });
-
-    console.log(`📞 Call rejected by ${ws.userId}, notifications sent to both users`);
   }
 
-  handleCallHistory(ws, payload) {
-    const { chatId, content, callData } = payload;
+  handleConnectionAccept(fromUserId, payload) {
+    const { connectionId, mentorId, menteeId } = payload;
     
-    if (!chatId || !content) {
-      this.sendError(ws, 'Chat ID and content are required for call history');
-      return;
-    }
-
-    // Create call history message
-    const callHistoryMessage = {
-      id: `call-history-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      chatId,
-      content,
-      type: 'call_history',
-      senderId: 'system',
-      senderName: 'System',
-      timestamp: new Date().toISOString(),
-      callData: callData || {}
+    // Notify both users
+    const mentorClient = this.clients.get(mentorId);
+    const menteeClient = this.clients.get(menteeId);
+    
+    const response = {
+      type: 'connection_accept',
+      payload: {
+        connectionId,
+        timestamp: new Date().toISOString()
+      }
     };
-
-    // Store in message history
-    if (!this.messageHistory.has(chatId)) {
-      this.messageHistory.set(chatId, []);
+    
+    if (mentorClient && mentorClient.readyState === WebSocket.OPEN) {
+      mentorClient.send(JSON.stringify(response));
     }
-    this.messageHistory.get(chatId).push(callHistoryMessage);
-
-    // Send to all participants in the chat
-    const participants = callData?.participants || [];
-    participants.forEach(participantId => {
-      const client = this.clients.get(participantId);
-      if (client && client.readyState === WebSocket.OPEN) {
-        this.sendMessage(client, {
-          type: 'call_history',
-          payload: callHistoryMessage
-        });
-      }
-    });
-
-    console.log(`📞 Call history added to chat ${chatId}: ${content}`);
+    
+    if (menteeClient && menteeClient.readyState === WebSocket.OPEN) {
+      menteeClient.send(JSON.stringify(response));
+    }
   }
 
-  handleIceCandidate(ws, payload) {
-    const { callId, toUserId, candidate } = payload;
+  handleConnectionReject(fromUserId, payload) {
+    const { connectionId, mentorId, menteeId } = payload;
     
-    if (!callId || !toUserId || !candidate) {
-      this.sendError(ws, 'Call ID, target user, and candidate are required');
-      return;
-    }
-
-    const targetClient = this.clients.get(toUserId);
-    if (!targetClient || targetClient.readyState !== WebSocket.OPEN) {
-      this.sendError(ws, 'Target user is not available');
-      return;
-    }
-
-    // Forward ICE candidate
-    this.sendMessage(targetClient, {
-      type: 'call_ice_candidate',
+    // Notify both users
+    const mentorClient = this.clients.get(mentorId);
+    const menteeClient = this.clients.get(menteeId);
+    
+    const response = {
+      type: 'connection_reject',
       payload: {
-        callId,
-        fromUserId: ws.userId,
-        candidate,
+        connectionId,
         timestamp: new Date().toISOString()
       }
-    });
+    };
+    
+    if (mentorClient && mentorClient.readyState === WebSocket.OPEN) {
+      mentorClient.send(JSON.stringify(response));
+    }
+    
+    if (menteeClient && menteeClient.readyState === WebSocket.OPEN) {
+      menteeClient.send(JSON.stringify(response));
+    }
   }
 
-  handleCallEnd(ws, payload) {
-    const { callId, toUserId, duration, callType } = payload;
+  handlePing(fromUserId, payload) {
+    const client = this.clients.get(fromUserId);
+    if (client && client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify({
+        type: 'pong',
+        payload: { timestamp: Date.now() }
+      }));
+    }
+  }
+
+  handleCallOffer(fromUserId, payload) {
+    console.log("📞 Handling call offer from", fromUserId, ":", payload);
+    const { targetUserId, toUserId, callId, offer, callType, fromUserName } = payload;
     
-    if (!callId) {
-      this.sendError(ws, 'Call ID is required');
+    // Support multiple ways to get target user ID:
+    // 1. From message 'to' field (set by WebSocketService.sendMessage)
+    // 2. From payload targetUserId field
+    // 3. From payload toUserId field
+    const targetUser = this.currentMessageTo || targetUserId || toUserId;
+    
+    if (!targetUser) {
+      console.error("❌ No target user ID found in call offer. Checked:", {
+        messageTo: this.currentMessageTo,
+        targetUserId,
+        toUserId,
+        payload
+      });
       return;
     }
+    
+    console.log("🎯 Target user for call offer:", targetUser);
+    
+    const targetClient = this.clients.get(targetUser);
+    if (targetClient && targetClient.readyState === WebSocket.OPEN) {
+      console.log("📤 Sending call offer to user", targetUser);
+      targetClient.send(JSON.stringify({
+        type: 'call_offer',
+        payload: {
+          callId,
+          fromUserId,
+          fromUserName: fromUserName || `User ${fromUserId.substr(-4)}`,
+          offer,
+          callType: callType || 'audio',
+          timestamp: new Date().toISOString()
+        }
+      }));
+      console.log("✅ Call offer sent successfully to", targetUser);
+    } else {
+      console.error("❌ Target user", targetUser, "not connected or WebSocket not open. ReadyState:", targetClient?.readyState);
+      console.log("📋 Available connected users:", Array.from(this.clients.keys()));
+    }
+  }
 
-    // Throttle call end messages to prevent spam
-    const throttleKey = `${ws.userId}-${callId}`;
+  handleCallAnswer(fromUserId, payload) {
+    console.log("📞 Handling call answer from", fromUserId, ":", payload);
+    const { targetUserId, toUserId, callId, answer } = payload;
+    
+    // Support multiple ways to get target user ID
+    const targetUser = this.currentMessageTo || targetUserId || toUserId;
+    
+    if (!targetUser) {
+      console.error("❌ No target user ID found in call answer. Checked:", {
+        messageTo: this.currentMessageTo,
+        targetUserId,
+        toUserId,
+        payload
+      });
+      return;
+    }
+    
+    console.log("🎯 Target user for call answer:", targetUser);
+    
+    const targetClient = this.clients.get(targetUser);
+    if (targetClient && targetClient.readyState === WebSocket.OPEN) {
+      console.log("📤 Sending call answer to user", targetUser);
+      targetClient.send(JSON.stringify({
+        type: 'call_answer',
+        payload: {
+          fromUserId,
+          callId,
+          answer,
+          timestamp: new Date().toISOString()
+        }
+      }));
+      console.log("✅ Call answer sent successfully to", targetUser);
+    } else {
+      console.error("❌ Target user", targetUser, "not connected or WebSocket not open. ReadyState:", targetClient?.readyState);
+    }
+  }
+
+  handleIceCandidate(fromUserId, payload) {
+    console.log("🧊 Handling ICE candidate from", fromUserId, ":", payload);
+    const { targetUserId, toUserId, callId, candidate } = payload;
+    
+    // Support multiple ways to get target user ID
+    const targetUser = this.currentMessageTo || targetUserId || toUserId;
+    
+    if (!targetUser) {
+      console.error("❌ No target user ID found in ICE candidate. Checked:", {
+        messageTo: this.currentMessageTo,
+        targetUserId,
+        toUserId,
+        payload
+      });
+      return;
+    }
+    
+    console.log("🎯 Target user for ICE candidate:", targetUser);
+    
+    const targetClient = this.clients.get(targetUser);
+    if (targetClient && targetClient.readyState === WebSocket.OPEN) {
+      console.log("📤 Sending ICE candidate to user", targetUser);
+      targetClient.send(JSON.stringify({
+        type: 'call_ice_candidate',
+        payload: {
+          fromUserId,
+          callId,
+          candidate,
+          timestamp: new Date().toISOString()
+        }
+      }));
+      console.log("✅ ICE candidate sent successfully to", targetUser);
+    } else {
+      console.error("❌ Target user", targetUser, "not connected or WebSocket not open. ReadyState:", targetClient?.readyState);
+    }
+  }
+
+  handleCallEnd(fromUserId, payload) {
+    console.log(`🔚 Handling call_end from ${fromUserId}:`, payload);
+    
+    // Extract target user ID from multiple possible sources:
+    // 1. From message 'to' field (set by WebSocketService.sendMessage)
+    // 2. From payload targetUserId field
+    // 3. From payload toUserId field
+    const targetUserId = this.currentMessageTo || payload.targetUserId || payload.toUserId;
+    const callId = payload.callId;
+    
+    if (!targetUserId) {
+      console.error("❌ No target user ID found in call_end. Checked:", {
+        messageTo: this.currentMessageTo,
+        targetUserId: payload.targetUserId,
+        toUserId: payload.toUserId,
+        payload
+      });
+      return;
+    }
+    
+    console.log(`🎯 Target user for call_end: ${targetUserId}`);
+    
+    // Rate limit call_end messages to prevent infinite loops
     const now = Date.now();
+    const throttleKey = `${fromUserId}-${targetUserId}`;
     const lastSent = this.callEndThrottle.get(throttleKey) || 0;
     
-    if (now - lastSent < 1000) { // 1 second throttle
+    if (now - lastSent < 1000) { // Only allow one call_end per second per user pair
+      console.log(`🛑 Throttling call_end from ${fromUserId} to ${targetUserId} - too frequent`);
       return;
     }
     
     this.callEndThrottle.set(throttleKey, now);
-
-    // Send call end to target user if specified
-    if (toUserId) {
-      const targetClient = this.clients.get(toUserId);
-      if (targetClient && targetClient.readyState === WebSocket.OPEN) {
-        this.sendMessage(targetClient, {
-          type: 'call_end',
-          payload: {
-            callId,
-            fromUserId: ws.userId,
-            duration,
-            callType,
-            timestamp: new Date().toISOString()
-          }
-        });
-      }
-    }
-
-    // Create call history message
-    if (toUserId) {
-      const chatId = this.getChatId(ws.userId, toUserId);
-      const callHistoryMessage = {
-        id: `call-${callId}`,
-        chatId,
-        content: `Call ended (${this.formatDuration(duration || 0)})`,
-        type: 'call_history',
-        senderId: 'system',
-        senderName: 'System',
-        timestamp: new Date().toISOString(),
-        callData: {
+    console.log(`📤 Processing call_end from ${fromUserId} to ${targetUserId}`);
+    
+    const targetClient = this.clients.get(targetUserId);
+    if (targetClient && targetClient.readyState === WebSocket.OPEN) {
+      console.log(`✅ Sending call_end to user ${targetUserId}`);
+      targetClient.send(JSON.stringify({
+        type: 'call_end',
+        payload: {
           callId,
-          duration,
-          callType,
-          participants: [ws.userId, toUserId]
+          fromUserId,
+          timestamp: new Date().toISOString()
         }
-      };
-
-      // Store in message history
-      if (!this.messageHistory.has(chatId)) {
-        this.messageHistory.set(chatId, []);
-      }
-      this.messageHistory.get(chatId).push(callHistoryMessage);
-
-      // Send to both participants
-      [ws.userId, toUserId].forEach(userId => {
-        const client = this.clients.get(userId);
-        if (client && client.readyState === WebSocket.OPEN) {
-          this.sendMessage(client, {
-            type: 'message',
-            payload: callHistoryMessage
-          });
-        }
-      });
+      }));
+      console.log(`✅ Call_end sent successfully to ${targetUserId}`);
+    } else {
+      console.error(`❌ Target user ${targetUserId} not connected or WebSocket not open. ReadyState:`, targetClient?.readyState);
+      console.log("📋 Available connected users:", Array.from(this.clients.keys()));
     }
-
-    console.log(`📞 Call ended: ${callId} (${this.formatDuration(duration || 0)})`);
+    
+    // Clean up old throttle entries
+    setTimeout(() => {
+      this.callEndThrottle.delete(throttleKey);
+    }, 5000);
   }
 
-  handleTypingIndicator(ws, payload) {
-    const { chatId, isTyping, userId } = payload;
+  handleCallHistory(fromUserId, payload) {
+    const { callId, duration, callType } = payload;
     
-    if (!chatId || !userId) {
-      this.sendError(ws, 'Chat ID and user ID are required');
-      return;
-    }
-
-    // Get chat participants
-    const participants = this.chats.get(chatId) || new Set();
+    console.log(`📞 Call history logged: ${callId}, duration: ${duration}s, type: ${callType}`);
     
-    // Send typing indicator to all participants except sender
-    participants.forEach(participantId => {
-      if (participantId !== userId) {
-        const client = this.clients.get(participantId);
-        if (client && client.readyState === WebSocket.OPEN) {
-          this.sendMessage(client, {
-            type: 'typing',
-            payload: {
-              chatId,
-              userId,
-              userName: ws.userName || `User ${userId.slice(-4)}`,
-              isTyping,
-              timestamp: new Date().toISOString()
-            }
-          });
-        }
+    // Broadcast call history to all connected clients for logging
+    this.clients.forEach((client, userId) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify({
+          type: 'call_history',
+          payload: {
+            callId,
+            duration,
+            callType,
+            fromUserId,
+            timestamp: new Date().toISOString()
+          }
+        }));
       }
     });
   }
 
-  handleMuteStatus(ws, payload) {
-    const { callId, toUserId, isMuted } = payload;
+  handleCallRinging(fromUserId, payload) {
+    console.log("🔔 Handling call ringing from", fromUserId, ":", payload);
+    const { targetUserId, toUserId, callId } = payload;
     
-    if (!callId || !toUserId) {
-      this.sendError(ws, 'Call ID and target user are required');
-      return;
-    }
-
-    const targetClient = this.clients.get(toUserId);
-    if (targetClient && targetClient.readyState === WebSocket.OPEN) {
-      this.sendMessage(targetClient, {
-        type: 'call_mute_status',
-        payload: {
-          callId,
-          fromUserId: ws.userId,
-          isMuted,
-          timestamp: new Date().toISOString()
-        }
+    // Support multiple ways to get target user ID
+    const targetUser = this.currentMessageTo || targetUserId || toUserId;
+    
+    if (!targetUser) {
+      console.error("❌ No target user ID found in call ringing. Checked:", {
+        messageTo: this.currentMessageTo,
+        targetUserId,
+        toUserId,
+        payload
       });
-    }
-  }
-
-  handleVideoStatus(ws, payload) {
-    const { callId, toUserId, isVideoOn } = payload;
-    
-    if (!callId || !toUserId) {
-      this.sendError(ws, 'Call ID and target user are required');
       return;
     }
-
-    const targetClient = this.clients.get(toUserId);
-    if (targetClient && targetClient.readyState === WebSocket.OPEN) {
-      this.sendMessage(targetClient, {
-        type: 'call_video_status',
-        payload: {
-          callId,
-          fromUserId: ws.userId,
-          isVideoOn,
-          timestamp: new Date().toISOString()
-        }
-      });
-    }
-  }
-
-  handleCallRinging(ws, payload) {
-    const { callId, toUserId, isRinging } = payload;
     
-    if (!callId || !toUserId) {
-      this.sendError(ws, 'Call ID and target user are required');
-      return;
-    }
-
-    const targetClient = this.clients.get(toUserId);
+    console.log("🎯 Target user for call ringing:", targetUser);
+    
+    const targetClient = this.clients.get(targetUser);
     if (targetClient && targetClient.readyState === WebSocket.OPEN) {
-      this.sendMessage(targetClient, {
+      console.log("📤 Sending call ringing to user", targetUser);
+      targetClient.send(JSON.stringify({
         type: 'call_ringing',
         payload: {
           callId,
-          fromUserId: ws.userId,
-          isRinging,
+          fromUserId,
           timestamp: new Date().toISOString()
         }
-      });
+      }));
+      console.log("✅ Call ringing sent successfully to", targetUser);
+    } else {
+      console.error("❌ Target user", targetUser, "not connected or WebSocket not open. ReadyState:", targetClient?.readyState);
     }
   }
 
-  handleScheduledMessage(ws, payload) {
-    const { chatId, content, scheduledTime, senderId } = payload;
+  handleCallMuteStatus(fromUserId, payload) {
+    console.log("🎤 Handling mute status from", fromUserId, ":", payload);
+    const { targetUserId, toUserId, isMuted, userId } = payload;
     
-    if (!chatId || !content || !scheduledTime || !senderId) {
-      this.sendError(ws, 'Chat ID, content, scheduled time, and sender ID are required');
+    // Support multiple ways to get target user ID
+    const targetUser = this.currentMessageTo || targetUserId || toUserId;
+    
+    if (!targetUser) {
+      console.error("❌ No target user ID found in mute status. Checked:", {
+        messageTo: this.currentMessageTo,
+        targetUserId,
+        toUserId,
+        payload
+      });
       return;
     }
-
-    const delay = new Date(scheduledTime).getTime() - Date.now();
     
-    if (delay > 0) {
-      setTimeout(() => {
-        this.handleChatMessage(ws, {
-          chatId,
-          content,
-          type: 'scheduled',
-          senderId,
-          senderName: ws.userName
-        });
-      }, delay);
-      
-      this.sendMessage(ws, {
-        type: 'scheduled_message_confirmed',
-        payload: { chatId, scheduledTime }
-      });
+    console.log("🎯 Target user for mute status:", targetUser);
+    
+    const targetClient = this.clients.get(targetUser);
+    if (targetClient && targetClient.readyState === WebSocket.OPEN) {
+      console.log("📤 Sending mute status to user", targetUser);
+      targetClient.send(JSON.stringify({
+        type: 'call_mute_status',
+        payload: {
+          isMuted,
+          userId: userId || fromUserId,
+          timestamp: new Date().toISOString()
+        }
+      }));
+      console.log("✅ Mute status sent successfully to", targetUser);
     } else {
-      this.sendError(ws, 'Scheduled time must be in the future');
+      console.error("❌ Target user", targetUser, "not connected or WebSocket not open. ReadyState:", targetClient?.readyState);
     }
   }
 
-  handleDisconnection(ws) {
-    if (ws.userId) {
-      console.log(`👋 User ${ws.userId} disconnected`);
-      
-      // Remove from clients
-      this.clients.delete(ws.userId);
-      
-      // Update user status
-      this.userStatus.set(ws.userId, { 
-        online: false, 
-        lastSeen: new Date(),
-        userName: ws.userName
+  handleCallVideoStatus(fromUserId, payload) {
+    console.log("📹 Handling video status from", fromUserId, ":", payload);
+    const { targetUserId, toUserId, videoEnabled, userId } = payload;
+    
+    // Support multiple ways to get target user ID
+    const targetUser = this.currentMessageTo || targetUserId || toUserId;
+    
+    if (!targetUser) {
+      console.error("❌ No target user ID found in video status. Checked:", {
+        messageTo: this.currentMessageTo,
+        targetUserId,
+        toUserId,
+        payload
       });
-      
-      // Broadcast user offline status
-      this.broadcastUserStatus(ws.userId, false);
-      
-      console.log(`📊 ${this.clients.size} users remaining`);
+      return;
+    }
+    
+    console.log("🎯 Target user for video status:", targetUser);
+    
+    const targetClient = this.clients.get(targetUser);
+    if (targetClient && targetClient.readyState === WebSocket.OPEN) {
+      console.log("📤 Sending video status to user", targetUser);
+      targetClient.send(JSON.stringify({
+        type: 'call_video_status',
+        payload: {
+          videoEnabled,
+          userId: userId || fromUserId,
+          timestamp: new Date().toISOString()
+        }
+      }));
+      console.log("✅ Video status sent successfully to", targetUser);
+    } else {
+      console.error("❌ Target user", targetUser, "not connected or WebSocket not open. ReadyState:", targetClient?.readyState);
     }
   }
 
-  broadcastUserStatus(userId, isOnline) {
-    const statusMessage = {
-      type: 'user_status',
-      payload: {
-        userId,
-        userName: this.userStatus.get(userId)?.userName || `User ${userId.slice(-4)}`,
-        isOnline,
-        lastSeen: new Date().toISOString()
+  handleScheduledMessage(fromUserId, payload) {
+    console.log(`📅 Handling scheduled message from ${fromUserId}:`, payload);
+    // For now, treat scheduled messages like regular messages
+    // In a real implementation, you'd store them and send at the scheduled time
+    this.handleChatMessage(fromUserId, payload);
+  }
+
+  broadcastToChatMembers(chatId, excludeUserId, message) {
+    console.log(`📡 Broadcasting to chat ${chatId}, excluding ${excludeUserId}:`, message);
+    console.log(`👥 Connected clients: ${Array.from(this.clients.keys()).join(', ')}`);
+    
+    // For simplicity, we'll broadcast to all connected users except the sender
+    // In a real app, you'd maintain chat membership data
+    let broadcastCount = 0;
+    this.clients.forEach((client, userId) => {
+      if (userId !== excludeUserId && client.readyState === WebSocket.OPEN) {
+        console.log(`📨 Sending to user ${userId} for chat ${chatId}`);
+        try {
+          client.send(JSON.stringify(message));
+          broadcastCount++;
+          console.log(`✅ Successfully sent to user ${userId}`);
+        } catch (error) {
+          console.error(`❌ Failed to send to user ${userId}:`, error);
+        }
+      } else if (userId === excludeUserId) {
+        console.log(`⏭️ Skipping sender ${userId}`);
+      } else {
+        console.log(`❌ User ${userId} not ready (state: ${client.readyState})`);
       }
+    });
+    console.log(`✅ Message broadcasted to ${broadcastCount} clients`);
+  }
+
+  broadcastUserJoined(userId) {
+    const message = {
+      type: 'user_joined',
+      payload: { userId }
     };
 
-    // Broadcast to all connected clients
-    this.clients.forEach((client, clientUserId) => {
-      if (clientUserId !== userId && client.readyState === WebSocket.OPEN) {
-        this.sendMessage(client, statusMessage);
+    this.clients.forEach((client, clientId) => {
+      if (clientId !== userId && client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify(message));
       }
     });
   }
 
-  sendMessage(ws, message) {
-    if (ws.readyState === WebSocket.OPEN) {
-      try {
-        ws.send(JSON.stringify(message));
-      } catch (error) {
-        console.error('❌ Failed to send message:', error);
+  broadcastUserLeft(userId) {
+    const message = {
+      type: 'user_left',
+      payload: { userId }
+    };
+
+    this.clients.forEach((client, clientId) => {
+      if (clientId !== userId && client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify(message));
       }
-    }
-  }
-
-  sendError(ws, errorMessage) {
-    this.sendMessage(ws, {
-      type: 'error',
-      payload: { message: errorMessage, timestamp: new Date().toISOString() }
-    });
-  }
-
-  getChatId(userId1, userId2) {
-    // Create consistent chat ID for two users
-    return [userId1, userId2].sort().join('-');
-  }
-
-  formatDuration(seconds) {
-    if (!seconds) return '0:00';
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
-  }
-
-  // Graceful shutdown
-  shutdown() {
-    console.log('🛑 Shutting down signaling server...');
-    
-    // Close all client connections
-    this.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.close(1000, 'Server shutting down');
-      }
-    });
-    
-    // Close WebSocket server
-    this.wss.close(() => {
-      console.log('✅ WebSocket server closed');
-    });
-    
-    // Close HTTP server
-    this.server.close(() => {
-      console.log('✅ HTTP server closed');
-      process.exit(0);
     });
   }
 }
 
-// Create and start server
-const server = new SignalingServer(process.env.PORT || 1883);
+// Start the server
+const server = new SignalingServer(process.env.PORT || 8080);
 
-// Handle graceful shutdown
-process.on('SIGINT', () => {
-  server.shutdown();
-});
-
+// Graceful shutdown
 process.on('SIGTERM', () => {
-  server.shutdown();
+  console.log('SIGTERM received, shutting down gracefully');
+  server.wss.close(() => {
+    process.exit(0);
+  });
 });
 
-module.exports = SignalingServer;
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully');
+  server.wss.close(() => {
+    process.exit(0);
+  });
+});

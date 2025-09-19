@@ -120,7 +120,7 @@ A **production-grade real-time messaging system** with WebRTC video/audio calls,
 cd server
 npm install
 npm start
-# Server runs on port 1883
+# Server runs on port 8080
 ```
 
 ### 2. Start the Frontend

@@ -327,15 +327,30 @@ export class WebRTCService {
     };
   }
 
-  private async handleCallOffer(data: { offer: RTCSessionDescriptionInit; callType: 'video' | 'audio' }) {
+  private async handleCallOffer(data: any) {
     try {
-      console.log('📞 Handling call offer for', data.callType, 'call');
+      // Extract the actual offer and callType from the payload
+      const offer = data.offer || data.payload?.offer;
+      const callType = data.callType || data.payload?.callType;
+      const fromUserId = data.fromUserId || data.payload?.fromUserId;
+      
+      console.log('📞 Handling call offer for', callType, 'call from', fromUserId);
+      
+      if (!offer || !callType) {
+        console.error('❌ Invalid call offer data:', data);
+        return;
+      }
+      
+      // Store the remote user ID for sending answers
+      if (fromUserId) {
+        this.remoteUserId = fromUserId;
+      }
       
       if (!this.peerConnection) {
         this.createPeerConnection();
       }
 
-      await this.peerConnection!.setRemoteDescription(data.offer);
+      await this.peerConnection!.setRemoteDescription(offer);
 
       // Add local stream if we have it
       if (this.localStream) {
@@ -363,30 +378,56 @@ export class WebRTCService {
     }
   }
 
-  private async handleCallAnswer(data: { answer: RTCSessionDescriptionInit }) {
+  private async handleCallAnswer(data: any) {
     try {
+      // Extract the actual answer from the payload
+      const answer = data.answer || data.payload?.answer;
+      
+      if (!answer) {
+        console.error('❌ Invalid call answer data:', data);
+        return;
+      }
+      
       if (this.peerConnection) {
-        await this.peerConnection.setRemoteDescription(data.answer);
+        await this.peerConnection.setRemoteDescription(answer);
       }
     } catch (error) {
       console.error('Error handling call answer:', error);
     }
   }
 
-  private async handleIceCandidate(data: { candidate: RTCIceCandidateInit }) {
+  private async handleIceCandidate(data: any) {
     try {
+      // Extract the actual candidate from the payload
+      const candidate = data.candidate || data.payload?.candidate;
+      
+      if (!candidate) {
+        console.error('❌ Invalid ICE candidate data:', data);
+        return;
+      }
+      
       if (this.peerConnection) {
-        await this.peerConnection.addIceCandidate(data.candidate);
+        await this.peerConnection.addIceCandidate(candidate);
       }
     } catch (error) {
       console.error('Error handling ICE candidate:', error);
     }
   }
 
-  private handleCallEnd() {
-    console.log('🔄 WebRTCService: Received call end from WebSocket');
+  private handleCallEnd(data: any) {
+    console.log('🔴 ❗ WebRTCService: Received call_end signal from WebSocket:', data);
+    console.log('🔄 WebRTCService: Processing call end - will trigger cleanup only');
+    
+    // Validate that this is actually a call_end message
+    if (!data && typeof data !== 'object') {
+      console.warn('⚠️ Invalid call_end data received:', data);
+    }
+    
     // Don't send notification back - this is from remote user
+    console.log('🧠 WebRTCService: Call end received from remote, performing silent cleanup');
     this.cleanup();
+    
+    console.log('✅ WebRTCService: Call end processing complete');
   }
 
   endCall() {

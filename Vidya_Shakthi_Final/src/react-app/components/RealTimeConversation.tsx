@@ -191,9 +191,31 @@ export const RealTimeConversation: React.FC<RealTimeConversationProps> = ({
   // Helper function to safely extract sender information
   const getSenderInfo = (sender: string | { _id: string; first_name: string; last_name: string; email: string; role: string }) => {
     if (typeof sender === 'string') {
+      // Try to find the participant in the conversation
+      const participant = conversation.participants.find(p => p._id === sender);
+      if (participant) {
+        return {
+          id: sender,
+          name: `${participant.first_name || ''} ${participant.last_name || ''}`.trim() || 'User',
+          email: participant.email || '',
+          role: participant.role || ''
+        };
+      }
+      
+      // If not found in participants, check if it's the current user
+      if (sender === user?.id) {
+        return {
+          id: sender,
+          name: user?.name || 'You',
+          email: user?.email || '',
+          role: user?.role || ''
+        };
+      }
+      
+      // Fallback for unknown sender
       return {
         id: sender,
-        name: 'Unknown User',
+        name: 'User',
         email: '',
         role: ''
       };
@@ -201,7 +223,7 @@ export const RealTimeConversation: React.FC<RealTimeConversationProps> = ({
     
     return {
       id: sender._id,
-      name: `${sender.first_name || ''} ${sender.last_name || ''}`.trim() || 'Unknown User',
+      name: `${sender.first_name || ''} ${sender.last_name || ''}`.trim() || 'User',
       email: sender.email || '',
       role: sender.role || ''
     };

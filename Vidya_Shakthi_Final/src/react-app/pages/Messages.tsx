@@ -604,7 +604,7 @@ export default function Messages() {
                   {!message.isMe && (
                     <div className="flex-shrink-0">
                       <Avatar 
-                        name={message.senderName || 'Unknown'} 
+                        name={message.senderName || 'User'} 
                         size="md" 
                         online={false}
                         showStatus={false}
@@ -617,7 +617,7 @@ export default function Messages() {
                     {!message.isMe && (
                       <div className="mb-1">
                         <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          {message.senderName || 'Unknown'}
+                          {message.senderName || 'User'}
                         </p>
                       </div>
                     )}

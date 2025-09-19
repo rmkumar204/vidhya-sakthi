@@ -102,7 +102,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               }`}>
                 {!isCurrentUser && (
                   <p className="text-xs font-semibold mb-1 opacity-75">
-                    {sender?.name || 'Unknown User'}
+                    {sender?.name || 'User'}
                   </p>
                 )}
                 <p className="text-sm">{msg.content}</p>

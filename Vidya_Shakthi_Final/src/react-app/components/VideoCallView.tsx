@@ -4,6 +4,32 @@ import { MicIcon, VideoCameraIcon, PhoneIcon } from './Icons';
 import { webRTCService } from '../services/WebRTCService';
 import { webSocketService } from '../services/WebSocketService';
 
+// Utility function to get user initials
+const getUserInitials = (name: string | undefined): string => {
+  if (!name || typeof name !== 'string') {
+    return 'U'; // Default to 'U' for User
+  }
+  return name
+    .split(' ')
+    .map(word => word.charAt(0))
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+};
+
+// Utility function to get avatar background color based on name
+const getAvatarColor = (name: string | undefined): string => {
+  if (!name || typeof name !== 'string') {
+    return 'bg-purple-500'; // Default color
+  }
+  const colors = [
+    'bg-purple-500', 'bg-blue-500', 'bg-green-500', 'bg-red-500', 
+    'bg-yellow-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'
+  ];
+  const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return colors[hash % colors.length];
+};
+
 interface VideoCallViewProps {
   user: User;
   otherUser: User;
@@ -32,7 +58,7 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({ user, otherUser, onEndCal
         // Get local stream from WebRTC service
         const localStream = webRTCService.getLocalStream();
         if (localStream && localVideoRef.current) {
-          localVideoRef.current.srcObject = localStream;
+      localVideoRef.current.srcObject = localStream;
           console.log('📹 VideoCallView: Local video stream set');
         }
         
@@ -219,42 +245,37 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({ user, otherUser, onEndCal
         autoPlay 
         playsInline
         muted={!localAudioEnabled || isMuted}
-        volume={localAudioEnabled ? 0.3 : 0}
       />
       
       {/* Remote Video */}
       <div className="relative w-full h-full flex items-center justify-center">
         {isConnected && !remoteVideoOff ? (
-          <video 
-            ref={remoteVideoRef} 
-            autoPlay 
-            playsInline 
-            className="w-full h-full object-cover"
+            <video
+              ref={remoteVideoRef}
+              autoPlay
+              playsInline
+              className="w-full h-full object-cover"
           />
         ) : isConnected && remoteVideoOff ? (
           <div className="flex flex-col items-center text-center bg-slate-800 p-8 rounded-lg shadow-2xl">
-            <img 
-              src={otherUser.avatarUrl} 
-              alt={otherUser.name} 
-              className="w-40 h-40 rounded-full mb-4 border-4 border-slate-600"
-            />
-            <h2 className="text-3xl font-bold">{otherUser.name}</h2>
+            <div className={`w-40 h-40 rounded-full mb-4 border-4 border-slate-600 flex items-center justify-center text-white text-4xl font-bold ${getAvatarColor(otherUser.name)}`}>
+              {getUserInitials(otherUser.name)}
+            </div>
+            <h2 className="text-3xl font-bold">{otherUser.name || 'Unknown User'}</h2>
             <p className="text-slate-400 mt-2">Camera is off</p>
             {remoteMuted && (
               <p className="text-red-400 mt-1 flex items-center gap-1">
-                <MicIcon className="w-4 h-4" /> Microphone muted
+                <MicIcon /> Microphone muted
               </p>
             )}
             <p className="text-green-400 text-lg font-mono mt-2">{formatDuration(callDuration)}</p>
           </div>
         ) : (
           <div className="flex flex-col items-center text-center bg-slate-800 p-8 rounded-lg">
-            <img 
-              src={otherUser.avatarUrl} 
-              alt={otherUser.name} 
-              className="w-32 h-32 rounded-full mb-4 border-4 border-slate-600 animate-pulse"
-            />
-            <h2 className="text-3xl font-bold">{otherUser.name}</h2>
+            <div className={`w-32 h-32 rounded-full mb-4 border-4 border-slate-600 animate-pulse flex items-center justify-center text-white text-3xl font-bold ${getAvatarColor(otherUser.name)}`}>
+              {getUserInitials(otherUser.name)}
+            </div>
+            <h2 className="text-3xl font-bold">{otherUser.name || 'Unknown User'}</h2>
             <p className="text-slate-400 mt-2">{connectionStatus}</p>
           </div>
         )}
@@ -269,9 +290,9 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({ user, otherUser, onEndCal
         {/* Remote User Mute Indicator */}
         {isConnected && !remoteVideoOff && remoteMuted && (
           <div className="absolute top-4 right-4 bg-red-500/80 backdrop-blur-sm px-3 py-1 rounded-full flex items-center gap-2">
-            <MicIcon className="w-4 h-4" />
-            <span className="text-white text-sm">{otherUser.name} muted</span>
-          </div>
+            <MicIcon />
+            <span className="text-white text-sm">{otherUser.name || 'User'} muted</span>
+                </div>
         )}
         
         {/* Local User Voice Monitoring Indicator */}
@@ -281,46 +302,48 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({ user, otherUser, onEndCal
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                 <span className="text-white text-xs">Voice Monitor</span>
-              </div>
+                </div>
             )}
             {isMuted && (
               <div className="flex items-center gap-1">
-                <MicIcon className="w-3 h-3 text-red-400" />
+                <MicIcon />
                 <span className="text-red-400 text-xs">Muted</span>
               </div>
             )}
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+        </div>
 
       {/* Local Video Preview */}
       {!isVideoOff ? (
-        <video 
-          ref={localVideoRef} 
-          autoPlay 
-          playsInline 
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
           muted 
           className="absolute bottom-5 right-5 w-64 h-48 rounded-lg object-cover border-2 border-slate-500"
-        />
-      ) : (
+            />
+          ) : (
         <div className="absolute bottom-5 right-5 w-64 h-48 rounded-lg bg-slate-800 border-2 border-slate-500 flex items-center justify-center">
           <div className="text-center">
-            <img src={user.avatarUrl} alt={user.name} className="w-16 h-16 rounded-full mx-auto mb-2"/>
+            <div className={`w-16 h-16 rounded-full mx-auto mb-2 flex items-center justify-center text-white text-lg font-bold ${getAvatarColor(user.name)}`}>
+              {getUserInitials(user.name)}
+            </div>
             <p className="text-sm text-slate-400">Camera Off</p>
             {isMuted && (
               <p className="text-red-400 text-xs mt-1 flex items-center justify-center gap-1">
-                <MicIcon className="w-3 h-3" /> Muted
+                <MicIcon /> Muted
               </p>
             )}
-          </div>
-        </div>
-      )}
+              </div>
+            </div>
+          )}
       
       {/* Controls */}
       <div className="absolute bottom-10 flex items-center gap-4 bg-slate-800/50 backdrop-blur-sm p-4 rounded-full">
         {/* Mute Button */}
         <div className="relative">
-          <button 
+          <button
             onClick={toggleMute} 
             className={`p-4 rounded-full transition-colors ${
               isMuted ? 'bg-red-500' : 'bg-slate-600 hover:bg-slate-500'
@@ -337,7 +360,7 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({ user, otherUser, onEndCal
         </div>
         
         {/* Voice Monitor Button */}
-        <button 
+          <button
           onClick={toggleLocalAudioMonitoring}
           className={`p-3 rounded-full transition-colors ${
             localAudioEnabled ? 'bg-green-600 hover:bg-green-500' : 'bg-slate-600 hover:bg-slate-500'
@@ -349,27 +372,27 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({ user, otherUser, onEndCal
               localAudioEnabled ? 'bg-white animate-pulse' : 'bg-gray-400'
             }`}></div>
           </div>
-        </button>
-        
+          </button>
+
         {/* Video Button */}
-        <button 
+          <button
           onClick={toggleVideo} 
-          className={`p-4 rounded-full transition-colors ${
+            className={`p-4 rounded-full transition-colors ${
             isVideoOff ? 'bg-red-500' : 'bg-slate-600 hover:bg-slate-500'
-          }`}
+            }`}
           title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
-        >
+          >
           <VideoCameraIcon />
-        </button>
-        
+          </button>
+
         {/* End Call Button */}
-        <button 
+          <button
           onClick={handleEndCall} 
           className="p-4 rounded-full bg-red-600 hover:bg-red-500 transition-colors"
-          title="End call"
-        >
+            title="End call"
+          >
           <PhoneIcon />
-        </button>
+          </button>
       </div>
     </div>
   );

@@ -44,7 +44,7 @@ const convertToUserType = (user: any): UserType => ({
   name: user?.name || 'Unknown User',
   email: user?.email || '',
   role: user?.role || '',
-  avatarUrl: user?.avatar || '',
+  avatarUrl: user?.avatar || 'https://via.placeholder.com/150/cccccc/969696?text=User',
   isOnline: true
 });
 
@@ -70,13 +70,23 @@ const CallManager: React.FC = () => {
   };
 
   // Initialize call signaling with connectsphere implementation
+  // Always pass a user object to maintain hook order consistency
+  const currentUser = user ? convertToUserType(user) : {
+    id: '',
+    name: 'Unknown User',
+    email: '',
+    role: '',
+    avatarUrl: 'https://via.placeholder.com/150/cccccc/969696?text=User',
+    isOnline: false
+  };
+  
   const {
     call: callState,
     initiateCall: signalingInitiateCall,
     acceptCall: signalingAcceptCall,
     rejectCall: signalingRejectCall,
     endCall: signalingEndCall
-  } = useCallSignaling(user ? convertToUserType(user) : null);
+  } = useCallSignaling(currentUser);
 
   // Handle call state changes
   useEffect(() => {

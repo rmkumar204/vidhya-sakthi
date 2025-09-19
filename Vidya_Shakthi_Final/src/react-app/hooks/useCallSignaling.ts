@@ -15,9 +15,15 @@ const useCallSignaling = (currentUser: User | null) => {
   console.log('🎯 useCallSignaling: Hook initialized with user:', currentUser?.name, 'Current call:', call?.status);
 
   useEffect(() => {
+    // Only proceed if we have a valid user with an ID
+    if (!currentUser || !currentUser.id) {
+      console.log('🎯 useCallSignaling: No valid user, skipping setup');
+      return;
+    }
+
     // Setup WebSocket listeners for incoming calls
     const handleIncomingCall = (data: any) => {
-      if (currentUser && data.callType) {
+      if (currentUser && currentUser.id && data.callType) {
         const incomingCall: Call = {
           id: `call-${Date.now()}`,
           from: data.from,
@@ -98,8 +104,8 @@ const useCallSignaling = (currentUser: User | null) => {
       }
     };
     
-    // Only set initial state if currentUser exists
-    if (currentUser) {
+    // Only set initial state if currentUser exists and has valid ID
+    if (currentUser && currentUser.id) {
       clearStaleCallState();
     } else {
       // Clear any call state if no user is logged in
@@ -115,34 +121,42 @@ const useCallSignaling = (currentUser: User | null) => {
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('connectsphere-call-update', handleCallUpdate);
     
-    // WebRTC service callbacks
-    webRTCService.onRemoteStream((stream) => {
-      setRemoteStream(stream);
-    });
-    
-    // Set up call end callback but prevent recursion
-    webRTCService.onCallEnd(() => {
-      console.log('🔄 WebRTC service triggered call end callback');
-      // Only clear local state, don't call handleCallEnd to avoid recursion
-      setCall(null);
-      setLocalStream(null);
-      setRemoteStream(null);
-      updateCallState(null);
-    });
-
     return () => {
       webSocketService.off('call_offer', handleIncomingCall);
       webSocketService.off('call_end', handleCallEnd);
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('connectsphere-call-update', handleCallUpdate);
       
+      console.log('🧹 useCallSignaling: Cleaned up WebSocket and storage listeners');
+    };
+  }, [currentUser?.id]); // Only depend on user ID, not the entire user object
+
+  // Separate useEffect for WebRTC callbacks to prevent re-registration
+  useEffect(() => {
+    // WebRTC service callbacks
+    const handleRemoteStream = (stream: MediaStream) => {
+      setRemoteStream(stream);
+    };
+    
+    const handleWebRTCCallEnd = () => {
+      console.log('🔄 WebRTC service triggered call end callback');
+      // Only clear local state, don't call handleCallEnd to avoid recursion
+      setCall(null);
+      setLocalStream(null);
+      setRemoteStream(null);
+      updateCallState(null);
+    };
+
+    webRTCService.onRemoteStream(handleRemoteStream);
+    webRTCService.onCallEnd(handleWebRTCCallEnd);
+
+    return () => {
       // Clear WebRTC callbacks to prevent memory leaks
       webRTCService.onRemoteStream(() => {});
       webRTCService.onCallEnd(() => {});
-      
-      console.log('🧹 useCallSignaling: Cleaned up all listeners and callbacks');
+      console.log('🧹 useCallSignaling: Cleaned up WebRTC callbacks');
     };
-  }, [currentUser]);
+  }, []); // Empty dependency array - only run once
 
   const updateCallState = (newCallState: Call | null) => {
     setCall(newCallState);
@@ -161,8 +175,8 @@ const useCallSignaling = (currentUser: User | null) => {
 
   // Add call history message to chat
   const addCallHistoryMessage = (call: Call, duration: number) => {
-    if (!currentUser || callHistoryAdded) {
-      console.log('⚠️ Call history already added or no user, skipping:', { callHistoryAdded, currentUser: !!currentUser });
+    if (!currentUser || !currentUser.id || callHistoryAdded) {
+      console.log('⚠️ Call history already added or no valid user, skipping:', { callHistoryAdded, currentUser: !!currentUser });
       return;
     }
     
@@ -232,7 +246,7 @@ const useCallSignaling = (currentUser: User | null) => {
   };
 
   const initiateCall = useCallback(async (userToCall: User, type: 'video' | 'audio') => {
-    if (!currentUser) return;
+    if (!currentUser || !currentUser.id) return;
     
     try {
       // Reset call history flag for new call
@@ -257,10 +271,10 @@ const useCallSignaling = (currentUser: User | null) => {
       setCall(null);
       updateCallState(null);
     }
-  }, [currentUser]);
+  }, [currentUser?.id]);
 
   const acceptCall = useCallback(async () => {
-    if (call && call.to.id === currentUser?.id) {
+    if (call && currentUser?.id && call.to.id === currentUser.id) {
       try {
         // Reset call history flag for accepted call
         setCallHistoryAdded(false);
@@ -276,13 +290,29 @@ const useCallSignaling = (currentUser: User | null) => {
         console.log('✅ Call accepted successfully:', call.type);
       } catch (error) {
         console.error('❌ Failed to accept call:', error);
+        
+        // Provide user-friendly error message
+        let errorMessage = 'Failed to accept call. Please try again.';
+        if (error instanceof Error) {
+          if (error.message && error.message.includes('Camera/microphone is currently in use')) {
+            errorMessage = error.message;
+          } else if (error.name === 'NotReadableError') {
+            errorMessage = 'Camera/microphone is currently in use by another application. Please close other applications and try again.';
+          } else if (error.name === 'NotAllowedError') {
+            errorMessage = 'Camera/microphone access was denied. Please allow access and try again.';
+          }
+        }
+        
+        // Show error to user (you can replace this with your preferred notification system)
+        console.error('User Error:', errorMessage);
+        
         rejectCall();
       }
     }
-  }, [call, currentUser]);
+  }, [call?.id, call?.to.id, call?.from.id, call?.type, currentUser?.id]); // More specific dependencies
 
   const rejectCall = useCallback(() => {
-    if (call && (call.to.id === currentUser?.id || call.from.id === currentUser?.id)) {
+    if (call && currentUser?.id && (call.to.id === currentUser.id || call.from.id === currentUser.id)) {
         console.log('🚫 Rejecting call:', call);
         try {
           // End WebRTC call and cleanup
@@ -313,7 +343,7 @@ const useCallSignaling = (currentUser: User | null) => {
           localStorage.removeItem(CALL_STORAGE_KEY);
         }
     }
-  }, [call, currentUser]);
+  }, [call?.id, call?.to.id, call?.from.id, currentUser?.id]);
 
   const endCall = useCallback(() => {
     if (isHandlingCallEnd) {
@@ -321,7 +351,7 @@ const useCallSignaling = (currentUser: User | null) => {
       return;
     }
     
-    if (call && (call.to.id === currentUser?.id || call.from.id === currentUser?.id)) {
+    if (call && currentUser?.id && (call.to.id === currentUser.id || call.from.id === currentUser.id)) {
         setIsHandlingCallEnd(true);
         console.log('📞 Ending call:', call);
         
@@ -339,7 +369,7 @@ const useCallSignaling = (currentUser: User | null) => {
           addCallHistoryMessage(call, callDuration);
           
           // End WebRTC call (this will send notification)
-    webRTCService.endCall();
+      webRTCService.endCall();
           
           // Dispatch update event
           window.dispatchEvent(new CustomEvent('connectsphere-call-update'));
@@ -367,7 +397,7 @@ const useCallSignaling = (currentUser: User | null) => {
           }, 500);
         }
     }
-  }, [call, currentUser, isHandlingCallEnd]);
+  }, [call?.id, call?.to.id, call?.from.id, call?.startTime, currentUser?.id, isHandlingCallEnd]);
 
   const toggleAudio = useCallback((enabled: boolean) => {
     webRTCService.toggleAudio(enabled);

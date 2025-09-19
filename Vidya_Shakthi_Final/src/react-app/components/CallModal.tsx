@@ -2,6 +2,32 @@ import React, { useEffect, useRef } from 'react';
 import { Call } from '../types';
 import { PhoneIcon, XIcon } from './Icons';
 
+// Utility function to get user initials
+const getUserInitials = (name: string | undefined): string => {
+  if (!name || typeof name !== 'string') {
+    return 'U'; // Default to 'U' for User
+  }
+  return name
+    .split(' ')
+    .map(word => word.charAt(0))
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+};
+
+// Utility function to get avatar background color based on name
+const getAvatarColor = (name: string | undefined): string => {
+  if (!name || typeof name !== 'string') {
+    return 'bg-purple-500'; // Default color
+  }
+  const colors = [
+    'bg-purple-500', 'bg-blue-500', 'bg-green-500', 'bg-red-500', 
+    'bg-yellow-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'
+  ];
+  const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return colors[hash % colors.length];
+};
+
 interface CallModalProps {
   call: Call;
   onAccept: () => void;
@@ -31,9 +57,11 @@ const CallModal: React.FC<CallModalProps> = ({ call, onAccept, onReject }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center">
       <div className="bg-slate-800 rounded-lg shadow-xl p-8 flex flex-col items-center gap-6 border border-slate-600 animate-pulse">
-        <img src={call.from.avatarUrl} alt={call.from.name} className="w-24 h-24 rounded-full border-4 border-slate-500" />
+        <div className={`w-24 h-24 rounded-full border-4 border-slate-500 flex items-center justify-center text-white text-2xl font-bold ${getAvatarColor(call.from.name)}`}>
+          {getUserInitials(call.from.name)}
+        </div>
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-white">{call.from.name}</h2>
+          <h2 className="text-2xl font-bold text-white">{call.from.name || 'Unknown User'}</h2>
           <p className="text-slate-400">is calling you...</p>
         </div>
         <div className="flex gap-4">

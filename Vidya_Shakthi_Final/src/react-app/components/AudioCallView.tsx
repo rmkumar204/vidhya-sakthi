@@ -4,6 +4,32 @@ import { MicIcon, PhoneIcon } from './Icons';
 import { webRTCService } from '../services/WebRTCService';
 import { webSocketService } from '../services/WebSocketService';
 
+// Utility function to get user initials
+const getUserInitials = (name: string | undefined): string => {
+  if (!name || typeof name !== 'string') {
+    return 'U'; // Default to 'U' for User
+  }
+  return name
+    .split(' ')
+    .map(word => word.charAt(0))
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+};
+
+// Utility function to get avatar background color based on name
+const getAvatarColor = (name: string | undefined): string => {
+  if (!name || typeof name !== 'string') {
+    return 'bg-purple-500'; // Default color
+  }
+  const colors = [
+    'bg-purple-500', 'bg-blue-500', 'bg-green-500', 'bg-red-500', 
+    'bg-yellow-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'
+  ];
+  const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return colors[hash % colors.length];
+};
+
 interface AudioCallViewProps {
   user: User;
   otherUser: User;
@@ -176,22 +202,19 @@ const AudioCallView: React.FC<AudioCallViewProps> = ({ user, otherUser, onEndCal
         ref={localAudioRef} 
         autoPlay 
         muted={!localAudioEnabled || isMuted}
-        volume={localAudioEnabled ? 0.5 : 0}
       />
       
       {/* Call Interface */}
       <div className="flex flex-col items-center text-center max-w-md w-full px-8">
         {/* Other User Avatar */}
         <div className="relative mb-8">
-          <img 
-            src={otherUser.avatarUrl} 
-            alt={otherUser.name} 
-            className={`w-40 h-40 rounded-full border-4 transition-all duration-300 ${
-              isConnected 
-                ? 'border-green-400 shadow-lg shadow-green-400/30' 
-                : 'border-slate-600 animate-pulse'
-            }`}
-          />
+          <div className={`w-40 h-40 rounded-full border-4 transition-all duration-300 flex items-center justify-center text-white text-4xl font-bold ${
+            isConnected 
+              ? 'border-green-400 shadow-lg shadow-green-400/30' 
+              : 'border-slate-600 animate-pulse'
+          } ${getAvatarColor(otherUser.name)}`}>
+            {getUserInitials(otherUser.name)}
+          </div>
           {isConnected && (
             <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center border-2 border-white">
               <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
@@ -200,8 +223,8 @@ const AudioCallView: React.FC<AudioCallViewProps> = ({ user, otherUser, onEndCal
         </div>
 
         {/* User Info */}
-        <h2 className="text-3xl font-bold mb-2">{otherUser.name}</h2>
-        <p className="text-lg text-slate-400 mb-2">{otherUser.role}</p>
+        <h2 className="text-3xl font-bold mb-2">{otherUser.name || 'Unknown User'}</h2>
+        <p className="text-lg text-slate-400 mb-2">{otherUser.role || 'User'}</p>
         
         {/* Status */}
         <div className="mb-6">
@@ -233,17 +256,15 @@ const AudioCallView: React.FC<AudioCallViewProps> = ({ user, otherUser, onEndCal
         {/* Your Avatar */}
         <div className="mb-8">
           <div className="flex items-center justify-center gap-4 bg-slate-800/50 backdrop-blur-sm rounded-2xl p-4">
-            <img 
-              src={user.avatarUrl} 
-              alt={user.name} 
-              className={`w-16 h-16 rounded-full border-2 transition-all ${
-                isMuted 
-                  ? 'border-red-400 opacity-50' 
-                  : 'border-slate-400'
-              }`}
-            />
+            <div className={`w-16 h-16 rounded-full border-2 transition-all flex items-center justify-center text-white text-lg font-bold ${
+              isMuted 
+                ? 'border-red-400 opacity-50' 
+                : 'border-slate-400'
+            } ${getAvatarColor(user.name)}`}>
+              {getUserInitials(user.name)}
+            </div>
             <div className="text-left">
-              <p className="text-slate-300 font-medium">{user.name}</p>
+              <p className="text-slate-300 font-medium">{user.name || 'You'}</p>
               <p className="text-slate-500 text-sm">{isMuted ? 'Muted' : 'Speaking'}</p>
             </div>
             {remoteMuted && (

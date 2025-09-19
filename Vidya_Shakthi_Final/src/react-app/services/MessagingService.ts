@@ -188,7 +188,7 @@ class MessagingService {
 
     // Send via WebSocket if online
     if (this.isOnline && webSocketService.isConnected()) {
-      webSocketService.sendMessage(chatId, content, messageType, fileUrl, callMetadata);
+      webSocketService.sendChatMessage(chatId, content, messageType as 'text' | 'voice' | 'call-history');
       message.isDelivered = true;
     } else {
       // Queue message for later sending
@@ -348,7 +348,7 @@ class MessagingService {
     localStorageService.saveConnection(storedConnection);
 
     if (this.isOnline && webSocketService.isConnected()) {
-      webSocketService.sendConnectionRequest(mentorId, menteeId, projectId);
+      webSocketService.sendConnectionRequest(mentorId, `Connection request for project ${projectId}`);
     }
 
     this.emit('connection_request_sent', connection);
@@ -363,7 +363,7 @@ class MessagingService {
     localStorageService.updateConnectionStatus(connectionId, status);
 
     if (this.isOnline && webSocketService.isConnected()) {
-      webSocketService.sendConnectionResponse(connectionId, connection.mentorId, connection.menteeId, status);
+      webSocketService.sendConnectionResponse(connectionId, status);
     }
 
     if (status === 'accepted') {
@@ -488,12 +488,10 @@ class MessagingService {
     this.messageQueue = [];
 
     messagesToSend.forEach(message => {
-      webSocketService.sendMessage(
+      webSocketService.sendChatMessage(
         message.chatId,
         message.content,
-        message.messageType,
-        message.fileUrl,
-        message.callMetadata
+        message.messageType as 'text' | 'voice' | 'call-history'
       );
     });
   }

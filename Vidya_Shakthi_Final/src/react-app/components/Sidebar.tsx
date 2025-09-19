@@ -170,7 +170,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
 
           {/* Conversations Link */}
           <div className="border-t border-gray-200 dark:border-gray-700 my-4"></div>
-          <Link
+          {/* <Link
             to="/app/conversations"
             onClick={() => setSidebarOpen(false)}
             className={`
@@ -183,7 +183,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
           >
             <PhoneIcon className="mr-3 h-5 w-5 flex-shrink-0" />
             Conversations
-          </Link>
+          </Link> */}
         </nav>
 
         {/* Logout */}

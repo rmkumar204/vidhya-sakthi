@@ -267,6 +267,38 @@ export class WebSocketService {
   isConnected(): boolean {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
   }
+
+  getConnectionState(): string {
+    if (!this.ws) return 'disconnected';
+    switch (this.ws.readyState) {
+      case WebSocket.CONNECTING: return 'connecting';
+      case WebSocket.OPEN: return 'connected';
+      case WebSocket.CLOSING: return 'closing';
+      case WebSocket.CLOSED: return 'disconnected';
+      default: return 'disconnected';
+    }
+  }
+
+  markMessageAsRead(chatId: string, messageId: string): void {
+    this.sendMessage('message_read', {
+      chatId,
+      messageId
+    });
+  }
+
+  sendConnectionRequest(toUserId: string, message?: string): void {
+    this.sendMessage('connection_request', {
+      toUserId,
+      message
+    }, toUserId);
+  }
+
+  sendConnectionResponse(requestId: string, status: 'accepted' | 'rejected'): void {
+    this.sendMessage('connection_response', {
+      requestId,
+      status
+    });
+  }
 }
 
 // Singleton instance

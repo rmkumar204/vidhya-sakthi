@@ -45,6 +45,12 @@ export class WebRTCService {
     try {
       console.log(`🎤 Initializing ${callType} call from ${userId} to ${remoteUserId}`);
       
+      // First, ensure any existing streams are properly cleaned up
+      await this.cleanupExistingStreams();
+      
+      // Wait a bit to ensure device is released
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Get user media with enhanced audio constraints
       this.localStream = await navigator.mediaDevices.getUserMedia({
         video: callType === 'video',
@@ -82,6 +88,50 @@ export class WebRTCService {
       return this.localStream;
     } catch (error) {
       console.error('❌ Error initializing call:', error);
+      
+      // Handle specific device in use error
+      if (error instanceof Error && (error.name === 'NotReadableError' || error.name === 'NotAllowedError')) {
+        console.log('🔄 Device access error during call initialization, attempting recovery...');
+        await this.cleanupExistingStreams();
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        try {
+          // Retry with a delay
+          this.localStream = await navigator.mediaDevices.getUserMedia({
+            video: callType === 'video',
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              sampleRate: 44100
+            }
+          });
+          
+          console.log('✅ Device access recovered on retry for call initialization');
+          
+          // Continue with call setup
+          this.createPeerConnection();
+          this.localStream.getTracks().forEach(track => {
+            if (this.peerConnection && this.localStream) {
+              console.log(`➕ Adding ${track.kind} track to peer connection`);
+              this.peerConnection.addTrack(track, this.localStream);
+            }
+          });
+
+          const offer = await this.peerConnection!.createOffer();
+          await this.peerConnection!.setLocalDescription(offer);
+
+          console.log('📤 Sending call offer to', remoteUserId);
+          webSocketService.sendCallOffer(remoteUserId, offer, callType);
+
+          return this.localStream;
+        } catch (retryError) {
+          console.error('❌ Device access still failed after retry:', retryError);
+          this.endCall();
+          throw new Error('Camera/microphone is currently in use by another application. Please close other applications using your camera/microphone and try again.');
+        }
+      }
+      
       // Clean up on error
       this.endCall();
       throw error;
@@ -94,6 +144,12 @@ export class WebRTCService {
 
     try {
       console.log(`📞 Answering ${callType} call from ${remoteUserId}`);
+      
+      // First, ensure any existing streams are properly cleaned up
+      await this.cleanupExistingStreams();
+      
+      // Wait a bit to ensure device is released
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       // Get user media with enhanced audio constraints based on call type
       this.localStream = await navigator.mediaDevices.getUserMedia({
@@ -114,9 +170,102 @@ export class WebRTCService {
       return this.localStream;
     } catch (error) {
       console.error('❌ Error answering call:', error);
+      
+      // Handle specific device in use error
+      if (error instanceof Error && (error.name === 'NotReadableError' || error.name === 'NotAllowedError')) {
+        console.log('🔄 Device access error, attempting recovery...');
+        await this.cleanupExistingStreams();
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        try {
+          // Retry with a delay
+          this.localStream = await navigator.mediaDevices.getUserMedia({
+            video: callType === 'video',
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              sampleRate: 44100
+            }
+          });
+          
+          console.log('✅ Device access recovered on retry');
+          return this.localStream;
+        } catch (retryError) {
+          console.error('❌ Device access still failed after retry:', retryError);
+          this.endCall();
+          throw new Error('Camera/microphone is currently in use by another application. Please close other applications using your camera/microphone and try again.');
+        }
+      }
+      
       // Clean up on error
       this.endCall();
       throw error;
+    }
+  }
+
+  private async cleanupExistingStreams(): Promise<void> {
+    console.log('🧹 Cleaning up existing streams...');
+    
+    // Stop any existing local stream
+    if (this.localStream) {
+      this.localStream.getTracks().forEach(track => {
+        track.stop();
+        console.log(`✋ Stopped existing ${track.kind} track`);
+      });
+      this.localStream = null;
+    }
+    
+    // Stop any existing remote stream
+    if (this.remoteStream) {
+      this.remoteStream.getTracks().forEach(track => {
+        track.stop();
+        console.log(`✋ Stopped existing remote ${track.kind} track`);
+      });
+      this.remoteStream = null;
+    }
+    
+    // Close any existing peer connection
+    if (this.peerConnection) {
+      this.peerConnection.close();
+      this.peerConnection = null;
+    }
+    
+    console.log('✅ Existing streams cleaned up');
+  }
+
+  async checkDeviceAvailability(callType: 'video' | 'audio'): Promise<{ available: boolean; error?: string }> {
+    try {
+      console.log(`🔍 Checking device availability for ${callType} call...`);
+      
+      // Get a temporary stream to test device availability
+      const testStream = await navigator.mediaDevices.getUserMedia({
+        video: callType === 'video',
+        audio: true
+      });
+      
+      // Immediately stop the test stream
+      testStream.getTracks().forEach(track => track.stop());
+      
+      console.log('✅ Devices are available');
+      return { available: true };
+    } catch (error) {
+      console.error('❌ Device availability check failed:', error);
+      
+      let errorMessage = 'Unknown error';
+      if (error instanceof Error) {
+        if (error.name === 'NotReadableError') {
+          errorMessage = 'Camera/microphone is currently in use by another application';
+        } else if (error.name === 'NotAllowedError') {
+          errorMessage = 'Camera/microphone access was denied';
+        } else if (error.name === 'NotFoundError') {
+          errorMessage = 'No camera/microphone found on this device';
+        } else if (error.name === 'OverconstrainedError') {
+          errorMessage = 'Camera/microphone constraints cannot be satisfied';
+        }
+      }
+      
+      return { available: false, error: errorMessage };
     }
   }
 

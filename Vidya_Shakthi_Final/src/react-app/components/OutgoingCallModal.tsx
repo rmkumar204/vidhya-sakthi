@@ -2,6 +2,32 @@ import React, { useEffect, useRef } from 'react';
 import { Call } from '../types';
 import { PhoneIcon, XIcon } from './Icons';
 
+// Utility function to get user initials
+const getUserInitials = (name: string | undefined): string => {
+  if (!name || typeof name !== 'string') {
+    return 'U'; // Default to 'U' for User
+  }
+  return name
+    .split(' ')
+    .map(word => word.charAt(0))
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+};
+
+// Utility function to get avatar background color based on name
+const getAvatarColor = (name: string | undefined): string => {
+  if (!name || typeof name !== 'string') {
+    return 'bg-purple-500'; // Default color
+  }
+  const colors = [
+    'bg-purple-500', 'bg-blue-500', 'bg-green-500', 'bg-red-500', 
+    'bg-yellow-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'
+  ];
+  const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return colors[hash % colors.length];
+};
+
 interface OutgoingCallModalProps {
   call: Call;
   onCancel: () => void;
@@ -30,13 +56,11 @@ const OutgoingCallModal: React.FC<OutgoingCallModalProps> = ({ call, onCancel })
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center">
       <div className="bg-slate-800 rounded-lg shadow-xl p-8 flex flex-col items-center gap-6 border border-slate-600">
-        <img 
-          src={call.to.avatarUrl} 
-          alt={call.to.name} 
-          className="w-32 h-32 rounded-full border-4 border-slate-500 animate-pulse" 
-        />
+        <div className={`w-32 h-32 rounded-full border-4 border-slate-500 flex items-center justify-center text-white text-3xl font-bold animate-pulse ${getAvatarColor(call.to.name)}`}>
+          {getUserInitials(call.to.name)}
+        </div>
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-white">{call.to.name}</h2>
+          <h2 className="text-2xl font-bold text-white">{call.to.name || 'Unknown User'}</h2>
           <p className="text-slate-400">Calling...</p>
           <div className="flex items-center justify-center mt-3 gap-2">
             <div className="w-3 h-3 bg-green-400 rounded-full animate-bounce delay-0"></div>

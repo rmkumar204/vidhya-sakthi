@@ -1,6 +1,7 @@
 import express from 'express';
 import { 
   createConnectionRequest, 
+  createGuidanceConnectionRequest,
   listConnectionRequests, 
   respondToConnectionRequest, 
   getConnectionRequest 
@@ -12,6 +13,9 @@ const router = express.Router();
 router.route('/')
   .get(protect, listConnectionRequests)
   .post(protect, createConnectionRequest);
+
+router.route('/guidance')
+  .post(protect, createGuidanceConnectionRequest);
 
 router.route('/:id')
   .get(protect, getConnectionRequest);

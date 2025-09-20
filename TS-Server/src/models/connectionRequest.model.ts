@@ -3,7 +3,7 @@ import mongoose, { Schema, Document, Types } from 'mongoose';
 interface IConnectionRequest extends Document {
   mentee: Types.ObjectId;
   mentor: Types.ObjectId;
-  project: Types.ObjectId;
+  project?: Types.ObjectId; // Optional for guidance connections
   status: 'pending' | 'accepted' | 'rejected';
   message?: string; // Optional message from mentee
   response_message?: string; // Optional response from mentor
@@ -27,7 +27,7 @@ const connectionRequestSchema: Schema = new Schema(
     project: { 
       type: Schema.Types.ObjectId, 
       ref: 'Project', 
-      required: true 
+      required: false // Make project optional for guidance connections
     },
     status: {
       type: String,

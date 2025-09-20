@@ -22,6 +22,7 @@ import Announcements from "@/react-app/pages/Announcements";
 import EnhancedMessages from "@/react-app/pages/EnhancedMessages";
 import Notifications from "@/react-app/pages/Notifications";
 import CallHistoryPage from "@/react-app/pages/CallHistoryPage";
+import Connect from "@/react-app/pages/Connect";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 // Call components from connectsphere
@@ -292,6 +293,7 @@ const CallManager: React.FC = () => {
           }>
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
+            <Route path="connect" element={<Connect />} />
             <Route path="mentees" element={<Mentees />} />
             <Route path="mentors" element={<Mentees />} />
             <Route path="projects" element={<Projects />} />

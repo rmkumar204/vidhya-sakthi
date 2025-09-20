@@ -1,4 +1,5 @@
 import asyncHandler from 'express-async-handler';
+import { Types } from 'mongoose';
 import ConnectionRequest from '../models/connectionRequest.model';
 import Conversation from '../models/conversation.model';
 import Notification from '../models/notification.model';
@@ -77,6 +78,74 @@ export const createConnectionRequest = asyncHandler(async (req, res) => {
     .populate('mentee', 'first_name last_name email')
     .populate('mentor', 'first_name last_name email')
     .populate('project', 'title description');
+
+  res.status(201).json(populatedRequest);
+});
+
+// POST /api/connection-requests/guidance - Create a guidance connection request (without project)
+export const createGuidanceConnectionRequest = asyncHandler(async (req, res) => {
+  const menteeId = req.user?._id;
+  const { mentorId, message } = req.body;
+
+  if (!menteeId) {
+    res.status(401);
+    throw new Error('Authentication required');
+  }
+
+  // Verify mentor exists
+  const mentor = await User.findById(mentorId);
+  if (!mentor || mentor.role !== 'mentor') {
+    res.status(404);
+    throw new Error('Mentor not found');
+  }
+
+  // Check if mentee has role
+  const mentee = await User.findById(menteeId);
+  if (!mentee || mentee.role !== 'mentee') {
+    res.status(403);
+    throw new Error('Only mentees can send connection requests');
+  }
+
+  // Check for existing pending guidance request (without project)
+  const existingRequest = await ConnectionRequest.findOne({
+    mentee: menteeId,
+    mentor: mentorId,
+    project: { $exists: false },
+    status: 'pending'
+  });
+
+  if (existingRequest) {
+    res.status(409);
+    throw new Error('You already have a pending guidance request with this mentor');
+  }
+
+  // Create guidance connection request (without project)
+  const connectionRequest = await ConnectionRequest.create({
+    mentee: menteeId,
+    mentor: mentorId,
+    // No project for guidance connection
+    message: message || 'Hi! I would like to connect with you for guidance and mentorship.',
+    status: 'pending'
+  });
+
+  // Create notification for mentor
+  await Notification.create({
+    recipient: mentorId,
+    type: 'connection_request',
+    title: 'New Guidance Request',
+    message: `${mentee.first_name} ${mentee.last_name} wants to connect for guidance and mentorship`,
+    data: {
+      connectionRequestId: connectionRequest._id,
+      menteeId: menteeId,
+      isGuidanceRequest: true
+    },
+    action_url: '/dashboard'
+  });
+
+  // Populate the response
+  const populatedRequest = await ConnectionRequest.findById(connectionRequest._id)
+    .populate('mentee', 'first_name last_name email')
+    .populate('mentor', 'first_name last_name email');
 
   res.status(201).json(populatedRequest);
 });
@@ -164,11 +233,11 @@ export const respondToConnectionRequest = asyncHandler(async (req, res) => {
     throw new Error('Invalid action. Must be "accept" or "reject"');
   }
 
-  // Find the connection request
+  // Find the connection request and populate mentor and project data
   const connectionRequest = await ConnectionRequest.findById(id)
     .populate('mentee', 'first_name last_name email')
     .populate('mentor', 'first_name last_name email')
-    .populate('project', 'title description');
+    .populate('project', 'title description thumbnail_url');
 
   if (!connectionRequest) {
     res.status(404);
@@ -199,13 +268,13 @@ export const respondToConnectionRequest = asyncHandler(async (req, res) => {
   if (action === 'accept') {
     conversation = await Conversation.create({
       participants: [connectionRequest.mentee._id, connectionRequest.mentor._id],
-      project: connectionRequest.project._id,
+      project: connectionRequest.project?._id || null, // Handle null project for guidance connections
       connection_request: connectionRequest._id,
       messages: [],
       is_active: true
     });
 
-    connectionRequest.conversation = conversation._id;
+    connectionRequest.conversation = conversation._id as Types.ObjectId;
   }
 
   await connectionRequest.save();
@@ -215,9 +284,17 @@ export const respondToConnectionRequest = asyncHandler(async (req, res) => {
     ? 'Connection Request Accepted!' 
     : 'Connection Request Declined';
   
+  // Handle both project-based and guidance connections in notification message
+  const mentorName = `${(connectionRequest.mentor as any).first_name} ${(connectionRequest.mentor as any).last_name}`;
+  const projectTitle = connectionRequest.project ? (connectionRequest.project as any).title : null;
+  
   const notificationMessage = action === 'accept'
-    ? `${connectionRequest.mentor.first_name} ${connectionRequest.mentor.last_name} accepted your request for "${connectionRequest.project.title}". You can now start messaging!`
-    : `${connectionRequest.mentor.first_name} ${connectionRequest.mentor.last_name} declined your request for "${connectionRequest.project.title}".`;
+    ? projectTitle
+      ? `${mentorName} accepted your request for "${projectTitle}". You can now start messaging!`
+      : `${mentorName} accepted your guidance request. You can now start messaging!`
+    : projectTitle
+      ? `${mentorName} declined your request for "${projectTitle}".`
+      : `${mentorName} declined your guidance request.`;
 
   await Notification.create({
     recipient: connectionRequest.mentee._id,
@@ -226,7 +303,7 @@ export const respondToConnectionRequest = asyncHandler(async (req, res) => {
     message: notificationMessage,
     data: {
       connectionRequestId: connectionRequest._id,
-      projectId: connectionRequest.project._id,
+      projectId: connectionRequest.project?._id || null, // Handle null project
       mentorId: connectionRequest.mentor._id,
       conversationId: conversation?._id
     },

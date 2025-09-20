@@ -18,7 +18,7 @@ export interface ConnectionRequest {
     title: string;
     description?: string;
     thumbnail_url?: string;
-  };
+  } | null; // Make project optional for guidance requests
   status: 'pending' | 'accepted' | 'rejected';
   message?: string;
   response_message?: string;

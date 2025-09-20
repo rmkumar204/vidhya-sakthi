@@ -20,7 +20,7 @@ interface IMessage extends Document {
 
 interface IConversation extends Document {
   participants: Types.ObjectId[];
-  project: Types.ObjectId;
+  project?: Types.ObjectId; // Optional for guidance conversations
   connection_request: Types.ObjectId;
   messages: IMessage[];
   last_message?: string;
@@ -92,7 +92,7 @@ const conversationSchema: Schema = new Schema(
     project: { 
       type: Schema.Types.ObjectId, 
       ref: 'Project', 
-      required: true 
+      required: false // Optional for guidance conversations
     },
     connection_request: { 
       type: Schema.Types.ObjectId, 

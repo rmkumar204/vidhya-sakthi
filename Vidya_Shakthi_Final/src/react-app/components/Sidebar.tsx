@@ -31,6 +31,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
 
   const navigation = [
     { name: 'Dashboard', href: '/app/dashboard', icon: HomeIcon },
+    ...(user?.role === 'mentee' ? [{ name: 'Connect', href: '/app/connect', icon: UserGroupIcon }] : []),
     { name: 'Mentees', href: '/app/mentees', icon: UserGroupIcon },
     { name: 'Projects', href: '/app/projects', icon: FolderIcon },
     { name: 'Tasks', href: '/app/tasks', icon: ClipboardDocumentListIcon },
@@ -72,7 +73,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
 
       {/* Sidebar */}
       <div className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-900 shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0
+        fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-900 shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 flex flex-col
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
@@ -186,8 +187,8 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
           </Link> */}
         </nav>
 
-        {/* Logout */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+        {/* Logout - Sticky to bottom */}
+        <div className="mt-auto p-4 border-t border-gray-200 dark:border-gray-700">
           <button
             onClick={handleLogout}
             className="w-full flex items-center px-2 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white rounded-md transition-colors"

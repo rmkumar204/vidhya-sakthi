@@ -140,11 +140,24 @@ export default function PendingRequests({ refreshTrigger, onRequestUpdate }: Pen
                     </div>
                   </div>
 
-                  {/* Project Info */}
+                  {/* Project Info or Guidance Request */}
                   <div className="mb-3">
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
-                      <span className="font-medium">Project:</span> {request.project.title}
-                    </p>
+                    {request.project ? (
+                      <>
+                        <p className="text-sm text-gray-600 dark:text-gray-300">
+                          <span className="font-medium">Project:</span> {request.project.title}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm text-gray-600 dark:text-gray-300">
+                          <span className="font-medium">Type:</span> Guidance Request
+                        </p>
+                        <div className="inline-flex items-center px-2 py-1 bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200 text-xs rounded-full mt-1">
+                          🌟 Mentorship Request
+                        </div>
+                      </>
+                    )}
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       Requested {formatDate(request.requested_at)}
                     </p>

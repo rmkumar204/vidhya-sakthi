@@ -3,6 +3,7 @@ import { User } from '../types';
 import { MicIcon, PhoneIcon } from './Icons';
 import { webRTCService } from '../services/WebRTCService';
 import { webSocketService } from '../services/WebSocketService';
+import { logger } from '../utils/logger';
 
 // Utility function to get user initials
 const getUserInitials = (name: string | undefined): string => {
@@ -67,7 +68,7 @@ const AudioCallView: React.FC<AudioCallViewProps> = ({ user, otherUser, onEndCal
             localAudioRef.current.srcObject = localStream;
             localAudioRef.current.volume = 0.5; // Higher volume for better feedback
             localAudioRef.current.muted = false; // Start unmuted for immediate feedback
-            console.log('🎤 AudioCallView: Local audio stream setup complete with monitoring enabled');
+            logger.call('🎤 AudioCallView: Local audio stream setup complete with monitoring enabled');
           }
         };
         
@@ -101,7 +102,7 @@ const AudioCallView: React.FC<AudioCallViewProps> = ({ user, otherUser, onEndCal
           }
         };
       } catch (err) {
-        console.error("Error setting up audio call:", err);
+        logger.error("Error setting up audio call:", err);
         setConnectionStatus('Connection failed');
         setTimeout(() => onEndCall(), 3000);
       }
@@ -137,7 +138,7 @@ const AudioCallView: React.FC<AudioCallViewProps> = ({ user, otherUser, onEndCal
 
   const toggleMute = () => {
     const newMutedState = !isMuted;
-    console.log('🔇 AudioCallView: Toggling mute from', isMuted, 'to', newMutedState);
+    logger.call('🔇 AudioCallView: Toggling mute from', isMuted, 'to', newMutedState);
     
     // Update WebRTC service
     webRTCService.toggleAudio(!newMutedState);
@@ -147,10 +148,10 @@ const AudioCallView: React.FC<AudioCallViewProps> = ({ user, otherUser, onEndCal
     
     // Send mute status to other user
     if (webSocketService.isConnected()) {
-      console.log('📡 AudioCallView: Sending mute status to other user:', { isMuted: newMutedState, userId: user.id });
+      logger.call('📡 AudioCallView: Sending mute status to other user:', { isMuted: newMutedState, userId: user.id });
       webSocketService.sendMuteStatus(otherUser.id, newMutedState, user.id);
     } else {
-      console.warn('⚠️ AudioCallView: WebSocket not connected, cannot send mute status');
+      logger.warn('⚠️ AudioCallView: WebSocket not connected, cannot send mute status');
     }
     
     // Update local audio monitoring
@@ -158,7 +159,7 @@ const AudioCallView: React.FC<AudioCallViewProps> = ({ user, otherUser, onEndCal
       localAudioRef.current.muted = newMutedState || !localAudioEnabled;
     }
     
-    console.log('🔊 AudioCallView: Mute state updated:', { 
+    logger.call('🔊 AudioCallView: Mute state updated:', { 
       isMuted: newMutedState, 
       localAudioEnabled, 
       localAudioMuted: localAudioRef.current?.muted,
@@ -168,7 +169,7 @@ const AudioCallView: React.FC<AudioCallViewProps> = ({ user, otherUser, onEndCal
 
   const toggleLocalAudioMonitoring = () => {
     const newState = !localAudioEnabled;
-    console.log('👂 AudioCallView: Toggling local audio monitoring from', localAudioEnabled, 'to', newState);
+    logger.call('👂 AudioCallView: Toggling local audio monitoring from', localAudioEnabled, 'to', newState);
     
     setLocalAudioEnabled(newState);
     
@@ -178,7 +179,7 @@ const AudioCallView: React.FC<AudioCallViewProps> = ({ user, otherUser, onEndCal
       localAudioRef.current.volume = newState ? 0.4 : 0; // Increase volume for better feedback
     }
     
-    console.log('🔊 AudioCallView: Local audio monitoring updated:', { 
+    logger.call('🔊 AudioCallView: Local audio monitoring updated:', { 
       localAudioEnabled: newState, 
       isMuted, 
       localAudioMuted: localAudioRef.current?.muted,
@@ -187,7 +188,7 @@ const AudioCallView: React.FC<AudioCallViewProps> = ({ user, otherUser, onEndCal
   };
 
   const handleEndCall = () => {
-    console.log('📞 AudioCallView: Ending call manually');
+    logger.call('📞 AudioCallView: Ending call manually');
     webRTCService.endCall();
     onEndCall();
   };

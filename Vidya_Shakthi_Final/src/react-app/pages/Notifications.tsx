@@ -15,6 +15,7 @@ import {
   TrashIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { logger } from '@/react-app/utils/logger';
 
 export default function Notifications() {
   const { user } = useAuth();
@@ -35,7 +36,7 @@ export default function Notifications() {
       );
       setNotifications(response.notifications);
     } catch (error) {
-      console.error('Failed to fetch notifications:', error);
+      logger.error('Failed to fetch notifications:', error);
     } finally {
       setLoading(false);
     }
@@ -59,7 +60,7 @@ export default function Notifications() {
         )
       );
     } catch (error) {
-      console.error('Failed to mark notification as read:', error);
+      logger.error('Failed to mark notification as read:', error);
     } finally {
       setProcessingIds(prev => prev.filter(id => id !== notificationId));
     }
@@ -80,7 +81,7 @@ export default function Notifications() {
       );
       toast.success('All notifications marked as read');
     } catch (error) {
-      console.error('Failed to mark all notifications as read:', error);
+      logger.error('Failed to mark all notifications as read:', error);
       toast.error('Failed to mark all notifications as read');
     } finally {
       setLoading(false);
@@ -96,7 +97,7 @@ export default function Notifications() {
       setNotifications(prev => prev.filter(notif => notif._id !== notificationId));
       toast.success('Notification deleted');
     } catch (error) {
-      console.error('Failed to delete notification:', error);
+      logger.error('Failed to delete notification:', error);
       toast.error('Failed to delete notification');
     } finally {
       setProcessingIds(prev => prev.filter(id => id !== notificationId));

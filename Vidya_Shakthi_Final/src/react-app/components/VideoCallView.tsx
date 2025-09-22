@@ -3,6 +3,7 @@ import { User } from '../types';
 import { MicIcon, VideoCameraIcon, PhoneIcon } from './Icons';
 import { webRTCService } from '../services/WebRTCService';
 import { webSocketService } from '../services/WebSocketService';
+import { logger } from '../utils/logger';
 
 // Utility function to get user initials
 const getUserInitials = (name: string | undefined): string => {
@@ -59,7 +60,7 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({ user, otherUser, onEndCal
         const localStream = webRTCService.getLocalStream();
         if (localStream && localVideoRef.current) {
       localVideoRef.current.srcObject = localStream;
-          console.log('📹 VideoCallView: Local video stream set');
+          logger.call('📹 VideoCallView: Local video stream set');
         }
         
         // Setup local audio monitoring for voice feedback
@@ -69,7 +70,7 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({ user, otherUser, onEndCal
             localAudioRef.current.srcObject = localStream;
             localAudioRef.current.volume = 0.3; // Lower volume to avoid feedback
             localAudioRef.current.muted = isMuted; // Respect mute state
-            console.log('🎤 VideoCallView: Local audio monitoring setup complete');
+            logger.call('🎤 VideoCallView: Local audio monitoring setup complete');
           }
         };
         
@@ -80,7 +81,7 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({ user, otherUser, onEndCal
         
         // Setup remote stream handler with separate audio handling
         webRTCService.onRemoteStream((stream) => {
-          console.log('📹 VideoCallView: Remote stream received:', {
+          logger.call('📹 VideoCallView: Remote stream received:', {
             audioTracks: stream.getAudioTracks().length,
             videoTracks: stream.getVideoTracks().length
           });
@@ -88,7 +89,7 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({ user, otherUser, onEndCal
           // Set video stream
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = stream;
-            console.log('📹 Remote video stream set');
+            logger.call('📹 Remote video stream set');
           }
           
           // Set audio stream separately for better control
@@ -97,9 +98,9 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({ user, otherUser, onEndCal
             remoteAudioRef.current.volume = 1.0; // Full volume for remote audio
             // Ensure audio plays even if autoplay is blocked
             remoteAudioRef.current.play().catch(e => {
-              console.warn('⚠️ Remote audio autoplay blocked, user interaction required:', e);
+              logger.warn('⚠️ Remote audio autoplay blocked, user interaction required:', e);
             });
-            console.log('🔊 Remote audio stream set with volume:', remoteAudioRef.current.volume);
+            logger.call('🔊 Remote audio stream set with volume:', remoteAudioRef.current.volume);
           }
           
           setIsConnected(true);
@@ -109,18 +110,18 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({ user, otherUser, onEndCal
           const videoTracks = stream.getVideoTracks();
           const hasVideo = videoTracks.length > 0 && videoTracks[0].enabled;
           setRemoteVideoOff(!hasVideo);
-          console.log('📹 Remote video status:', { hasVideo, trackCount: videoTracks.length });
+          logger.call('📹 Remote video status:', { hasVideo, trackCount: videoTracks.length });
         });
         
         // Setup call end handler
         webRTCService.onCallEnd(() => {
-          console.log('📞 VideoCallView: Call ended by WebRTC service');
+          logger.call('📞 VideoCallView: Call ended by WebRTC service');
           onEndCall();
         });
         
         // Setup mute status listener
         const handleMuteStatus = (data: { isMuted: boolean; userId: string }) => {
-          console.log('🎤 Mute status received:', data);
+          logger.call('🎤 Mute status received:', data);
           if (data.userId !== user.id) {
             setRemoteMuted(data.isMuted);
           }
@@ -128,7 +129,7 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({ user, otherUser, onEndCal
         
         // Setup video status listener
         const handleVideoStatus = (data: { videoEnabled: boolean; userId: string }) => {
-          console.log('📹 Video status received:', data);
+          logger.call('📹 Video status received:', data);
           if (data.userId !== user.id) {
             setRemoteVideoOff(!data.videoEnabled);
           }
@@ -144,7 +145,7 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({ user, otherUser, onEndCal
           webSocketService.off('call_video_status', handleVideoStatus);
         };
       } catch (err) {
-        console.error('❌ Error setting up video call:', err);
+        logger.error('❌ Error setting up video call:', err);
         setConnectionStatus('Connection failed');
         setTimeout(() => onEndCall(), 3000);
       }
@@ -180,7 +181,7 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({ user, otherUser, onEndCal
 
   const toggleMute = () => {
     const newMutedState = !isMuted;
-    console.log('🎤 VideoCallView: Toggling mute from', isMuted, 'to', newMutedState);
+    logger.call('🎤 VideoCallView: Toggling mute from', isMuted, 'to', newMutedState);
     
     webRTCService.toggleAudio(!newMutedState);
     setIsMuted(newMutedState);
@@ -188,19 +189,19 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({ user, otherUser, onEndCal
     // Update local audio monitoring
     if (localAudioRef.current) {
       localAudioRef.current.muted = newMutedState;
-      console.log('🎤 Local audio monitoring muted:', newMutedState);
+      logger.call('🎤 Local audio monitoring muted:', newMutedState);
     }
     
     // Send mute status to other user
     if (webSocketService.isConnected()) {
       webSocketService.sendMuteStatus(otherUser.id, newMutedState, user.id);
-      console.log('📡 Sent mute status to', otherUser.name, ':', newMutedState);
+      logger.call('📡 Sent mute status to', otherUser.name, ':', newMutedState);
     }
   };
   
   const toggleVideo = () => {
     const newVideoState = !isVideoOff;
-    console.log('📹 VideoCallView: Toggling video from', isVideoOff, 'to', newVideoState);
+    logger.call('📹 VideoCallView: Toggling video from', isVideoOff, 'to', newVideoState);
     
     webRTCService.toggleVideo(!newVideoState);
     setIsVideoOff(newVideoState);
@@ -208,7 +209,7 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({ user, otherUser, onEndCal
     // Send video status to other user
     if (webSocketService.isConnected()) {
       webSocketService.sendVideoStatus(otherUser.id, newVideoState, user.id);
-      console.log('📡 Sent video status to', otherUser.name, ':', !newVideoState);
+      logger.call('📡 Sent video status to', otherUser.name, ':', !newVideoState);
     }
   };
 
@@ -221,7 +222,7 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({ user, otherUser, onEndCal
       localAudioRef.current.volume = newState ? 0.3 : 0;
     }
     
-    console.log('🔊 VideoCallView: Local audio monitoring updated:', { 
+    logger.call('🔊 VideoCallView: Local audio monitoring updated:', { 
       localAudioEnabled: newState, 
       isMuted, 
       volume: localAudioRef.current?.volume
@@ -229,7 +230,7 @@ const VideoCallView: React.FC<VideoCallViewProps> = ({ user, otherUser, onEndCal
   };
 
   const handleEndCall = () => {
-    console.log('📞 VideoCallView: Ending call manually');
+    logger.call('📞 VideoCallView: Ending call manually');
     webRTCService.endCall();
     onEndCall();
   };

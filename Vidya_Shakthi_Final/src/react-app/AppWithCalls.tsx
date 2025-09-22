@@ -4,6 +4,7 @@ import { AuthProvider } from "@/react-app/contexts/AuthContext";
 import { useAuth } from "@/react-app/hooks/useAuth";
 import { Toaster } from 'react-hot-toast';
 import { useEffect } from 'react';
+import { logger } from "@/react-app/utils/logger";
 
 // Public pages
 import RoleSelection from "@/react-app/pages/RoleSelection";
@@ -109,10 +110,10 @@ const CallManager: React.FC = () => {
     
     // Add custom event listener for call state changes (additional reliability)
     const handleCallStateChanged = (event: CustomEvent) => {
-      console.log('🔔 AppWithCalls: Custom call state change event received:', event.detail);
+      logger.info('🔔 AppWithCalls: Custom call state change event received:', event.detail);
       // Force a re-render by updating a dummy state if needed
       if (event.detail?.action === 'call_accepted') {
-        console.log('✅ Call accepted event detected, ensuring UI updates');
+        logger.info('✅ Call accepted event detected, ensuring UI updates');
         // The state should already be updated, but this ensures React re-renders
       }
     };
@@ -139,7 +140,7 @@ const CallManager: React.FC = () => {
       
       await signalingInitiateCall(userToCall, callType);
     } catch (error) {
-      console.error('Failed to initiate call:', error);
+      logger.error('Failed to initiate call:', error);
     }
   };
 
@@ -147,7 +148,7 @@ const CallManager: React.FC = () => {
     try {
       await signalingAcceptCall();
     } catch (error) {
-      console.error('Failed to accept call:', error);
+      logger.error('Failed to accept call:', error);
     }
   };
 
@@ -169,7 +170,7 @@ const CallManager: React.FC = () => {
   // Debug call state logic with enhanced logging
   useEffect(() => {
     if (callState) {
-      console.log('📡 ❗ AppWithCalls: Call state changed:', {
+      logger.info('📡 ❗ AppWithCalls: Call state changed:', {
         callId: callState.id,
         callStatus: callState.status,
         fromUser: callState.from.id,
@@ -186,30 +187,30 @@ const CallManager: React.FC = () => {
       
       // Additional debug: Check what UI components should be visible
       if (isCallActive) {
-        console.log('🎯 Active call detected - should show AudioCallView/VideoCallView');
+        logger.info('🎯 Active call detected - should show AudioCallView/VideoCallView');
       } else if (isOutgoingCall) {
-        console.log('📞 Outgoing call detected - should show OutgoingCallModal');
+        logger.info('📞 Outgoing call detected - should show OutgoingCallModal');
       } else if (isReceivingCall) {
-        console.log('📲 Incoming call detected - should show CallModal');
+        logger.info('📲 Incoming call detected - should show CallModal');
       }
     } else {
-      console.log('📡 AppWithCalls: No call state - all call components should be hidden');
+      logger.info('📡 AppWithCalls: No call state - all call components should be hidden');
     }
   }, [callState?.status, callState?.id, isReceivingCall, isOutgoingCall, isCallActive]);
 
   // Expose debugging functions globally for testing
   useEffect(() => {
     (window as any).debugAppCallState = () => {
-      console.log('📡 ❗ AppWithCalls Debug State:');
-      console.log('- callState:', callState);
-      console.log('- callState.status:', callState?.status);
-      console.log('- callState.from.id:', callState?.from?.id);
-      console.log('- callState.to.id:', callState?.to?.id);
-      console.log('- user.id:', user?.id);
-      console.log('- isReceivingCall:', isReceivingCall);
-      console.log('- isOutgoingCall:', isOutgoingCall);
-      console.log('- isCallActive:', isCallActive);
-      console.log('- otherUserInCall:', otherUserInCall);
+      logger.info('📡 ❗ AppWithCalls Debug State:');
+      logger.info('- callState:', callState);
+      logger.info('- callState.status:', callState?.status);
+      logger.info('- callState.from.id:', callState?.from?.id);
+      logger.info('- callState.to.id:', callState?.to?.id);
+      logger.info('- user.id:', user?.id);
+      logger.info('- isReceivingCall:', isReceivingCall);
+      logger.info('- isOutgoingCall:', isOutgoingCall);
+      logger.info('- isCallActive:', isCallActive);
+      logger.info('- otherUserInCall:', otherUserInCall);
       
       return {
         callState,
@@ -224,13 +225,13 @@ const CallManager: React.FC = () => {
     
     (window as any).forceCallActive = () => {
       if (callState) {
-        console.log('🔴 Manually forcing call to ACTIVE state for debugging');
+        logger.info('🔴 Manually forcing call to ACTIVE state for debugging');
         const activeCall = { ...callState, status: CallStatus.ACTIVE };
-        console.log('Force updating call state to:', activeCall);
+        logger.info('Force updating call state to:', activeCall);
         // This would need to trigger the useCallSignaling to update
         // For debugging purposes only
       } else {
-        console.log('⚠️ No call state available to force active');
+        logger.info('⚠️ No call state available to force active');
       }
     };
     

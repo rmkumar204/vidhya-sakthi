@@ -5,6 +5,7 @@ import { useTheme } from '@/react-app/contexts/ThemeContext';
 import { useAuth } from '../hooks/useAuth';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { logger } from '@/react-app/utils/logger';
 
 interface HeaderProps {
   setSidebarOpen: (open: boolean) => void;
@@ -36,7 +37,7 @@ export default function Header({ setSidebarOpen }: HeaderProps) {
           setUnreadCount(data.count || 0);
         }
       } catch (error) {
-        console.error('Error fetching unread count:', error);
+        logger.error('Error fetching unread count:', error);
         // Don't show toast for background fetch errors to avoid spam
       }
     };

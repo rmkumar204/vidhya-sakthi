@@ -1,4 +1,5 @@
 import { ICE_SERVERS } from './constants';
+import { logger } from '../utils/logger';
 
 // WebRTC utility functions
 export const createPeerConnection = (): RTCPeerConnection => {
@@ -37,7 +38,7 @@ export const getUserMedia = async (constraints: MediaStreamConstraints): Promise
 
     return stream;
   } catch (error: any) {
-    console.error('Error accessing media devices:', error);
+    logger.error('Error accessing media devices:', error);
     
     // Provide more specific error messages
     if (error.name === 'NotAllowedError') {
@@ -60,18 +61,18 @@ export const getDisplayMedia = async (constraints: DisplayMediaStreamConstraints
   try {
     return await navigator.mediaDevices.getDisplayMedia(constraints);
   } catch (error) {
-    console.error('Error accessing display media:', error);
+    logger.error('Error accessing display media:', error);
     throw new Error('Failed to access screen sharing. Please check permissions.');
   }
 };
 
 export const stopMediaStream = (stream: MediaStream | null): void => {
   if (stream) {
-    console.log('Stopping media stream with', stream.getTracks().length, 'tracks');
+    logger.call('Stopping media stream with', stream.getTracks().length, 'tracks');
     stream.getTracks().forEach(track => {
-      console.log(`Stopping ${track.kind} track:`, track.label);
+      logger.call(`Stopping ${track.kind} track:`, track.label);
       track.stop();
-      console.log(`Stopped ${track.kind} track`);
+      logger.call(`Stopped ${track.kind} track`);
     });
     
     // Clear the stream object
@@ -141,7 +142,7 @@ export const checkMediaPermissions = async (): Promise<{camera: boolean, microph
       microphone: microphonePermission.state === 'granted'
     };
   } catch (error) {
-    console.warn('Permission API not supported:', error);
+    logger.warn('Permission API not supported:', error);
     return { camera: false, microphone: false };
   }
 };
@@ -158,7 +159,7 @@ export const requestMediaPermissions = async (): Promise<boolean> => {
     stream.getTracks().forEach(track => track.stop());
     return true;
   } catch (error) {
-    console.error('Failed to request media permissions:', error);
+    logger.error('Failed to request media permissions:', error);
     return false;
   }
 };

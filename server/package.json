@@ -20,7 +20,10 @@
   "license": "MIT",
   "dependencies": {
     "uuid": "^10.0.0",
-    "ws": "^8.14.2"
+    "ws": "^8.14.2",
+    "winston": "^3.11.0",
+    "winston-daily-rotate-file": "^4.7.1",
+    "dotenv": "^16.6.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

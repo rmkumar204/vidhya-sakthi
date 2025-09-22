@@ -1,5 +1,6 @@
 // User Service
 // This service manages user data fetching and caching
+import { logger } from '../utils/logger';
 
 export interface UserData {
   id: string;
@@ -61,11 +62,11 @@ export async function fetchUserById(userId: string, token: string): Promise<User
       
       return user;
     } else {
-      console.warn(`Failed to fetch user ${userId}:`, response.status);
+      logger.warn(`Failed to fetch user ${userId}:`, response.status);
       return null;
     }
   } catch (error) {
-    console.error(`Error fetching user ${userId}:`, error);
+    logger.error(`Error fetching user ${userId}:`, error);
     return null;
   }
 }

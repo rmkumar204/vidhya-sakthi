@@ -6,6 +6,7 @@ import {
   UserPlusIcon,
   UserIcon 
 } from '@heroicons/react/24/outline';
+import { logger } from '../utils/logger';
 
 const UserList: React.FC = () => {
   const { users, sendConnectionRequest } = useAppContext();
@@ -23,7 +24,7 @@ const UserList: React.FC = () => {
     try {
       await sendConnectionRequest(userId);
     } catch (error) {
-      console.error('Failed to send connection request:', error);
+      logger.error('Failed to send connection request:', error);
     }
   };
 

@@ -18,6 +18,7 @@ import {
 } from '@heroicons/react/24/solid';
 import Avatar from './Avatar';
 import TypingIndicator from './TypingIndicator';
+import { logger } from '../utils/logger';
 import { useConversationWebRTC } from '../hooks/useConversationWebRTC';
 import { 
   Conversation, 
@@ -83,8 +84,8 @@ export const RealTimeConversation: React.FC<RealTimeConversationProps> = ({
       realTimeServiceRef.current = new RealTimeConversationService(user.token, user.id);
       
       realTimeServiceRef.current.connect(conversation._id).then(() => {
-        console.log('Real-time conversation connected');
-      }).catch(console.error);
+        logger.chat('Real-time conversation connected');
+      }).catch(logger.error);
 
       // Set up event handlers
       realTimeServiceRef.current.on('message', handleNewMessage);
@@ -120,17 +121,17 @@ export const RealTimeConversation: React.FC<RealTimeConversationProps> = ({
     e.preventDefault();
     if (!newMessage.trim() || isSending) return;
 
-    console.log("---------- sub");
+    logger.chat("---------- sub");
     
 
     setIsSending(true);
     try {
-        console.log("---------- in");
-        console.log(realTimeServiceRef.current);
+        logger.chat("---------- in");
+        logger.chat(realTimeServiceRef.current);
         
       // Send via real-time service
       if (realTimeServiceRef.current) {
-        console.log({newMessage});
+        logger.chat({newMessage});
         
         realTimeServiceRef.current.sendMessage(newMessage.trim());
       }
@@ -144,7 +145,7 @@ export const RealTimeConversation: React.FC<RealTimeConversationProps> = ({
       setNewMessage('');
       setIsTyping(false);
     } catch (error) {
-      console.error('Error sending message:', error);
+      logger.error('Error sending message:', error);
       toast.error('Failed to send message');
     } finally {
       setIsSending(false);

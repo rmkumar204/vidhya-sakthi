@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { VoiceMessageRecorder } from './VoiceMessageRecorder';
 import { VoiceMessagePlayer } from './VoiceMessagePlayer';
+import { logger } from '../utils/logger';
 
 interface MessageInputProps {
   onSendMessage: (message: string, files?: File[], voiceBlob?: Blob) => void;
@@ -547,16 +548,16 @@ export default function MessageInput({
   }, [message]);
 
   const handleSendClick = () => {
-    console.log("🚀 handleSendClick called!");
-    console.log("Message state:", message);
-    console.log("Attached files:", attachedFiles);
-    console.log("Voice message:", voiceMessage);
+    logger.chat("🚀 handleSendClick called!");
+    logger.chat("Message state:", message);
+    logger.chat("Attached files:", attachedFiles);
+    logger.chat("Voice message:", voiceMessage);
     
     const textContent = editorRef.current?.textContent?.trim() || '';
-    console.log("Text content from editor:", textContent);
+    logger.chat("Text content from editor:", textContent);
     
     if (textContent || attachedFiles.length > 0 || voiceMessage) {
-      console.log("✅ Sending message via onSendMessage");
+      logger.chat("✅ Sending message via onSendMessage");
       onSendMessage(message, attachedFiles.length > 0 ? attachedFiles : undefined, voiceMessage || undefined);
       
       // Clear the contentEditable div
@@ -574,14 +575,14 @@ export default function MessageInput({
         onTyping(false);
       }
     } else {
-      console.log("❌ No content to send");
+      logger.chat("❌ No content to send");
     }
   };
 
   const handleVoiceRecordingComplete = (audioBlob: Blob, duration: number) => {
     setVoiceMessage(audioBlob);
     setShowVoiceRecorder(false);
-    console.log(`Voice message recorded: ${duration}s`);
+    logger.chat(`Voice message recorded: ${duration}s`);
   };
 
   const handleVoiceRecordingCancel = () => {
@@ -600,12 +601,12 @@ export default function MessageInput({
 
 
   const handleEditorChange = () => {
-    console.log("sdsdsdsdsd---------------------------");
+    logger.chat("sdsdsdsdsd---------------------------");
     
     if (editorRef.current) {
       const content = editorRef.current.innerHTML;
       const textContent = editorRef.current.textContent || '';
-      console.log("📝 Editor changed - HTML:", content, "Text:", textContent);
+      logger.chat("📝 Editor changed - HTML:", content, "Text:", textContent);
       setMessage(content);
       if (onTyping) {
         onTyping(textContent.trim().length > 0);
@@ -1136,10 +1137,10 @@ export default function MessageInput({
           <button
             type="button"
             onClick={() => {
-              console.log('🚀 Send button clicked!');
-              console.log('Message content:', message);
-              console.log('Attached files:', attachedFiles.length);
-              console.log('Editor text content:', editorRef.current?.textContent?.trim());
+              logger.chat('🚀 Send button clicked!');
+              logger.chat('Message content:', message);
+              logger.chat('Attached files:', attachedFiles.length);
+              logger.chat('Editor text content:', editorRef.current?.textContent?.trim());
               handleSendClick();
             }}
             disabled={disabled || (!message.trim() && attachedFiles.length === 0)}

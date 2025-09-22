@@ -1,4 +1,5 @@
 // Frontend service for conversations with real-time communication
+import { logger } from '../utils/logger';
 export interface ConversationMessage {
   _id: string;
   sender: string | {
@@ -212,7 +213,7 @@ export class RealTimeConversationService {
         this.ws = new WebSocket(wsUrl);
         
         this.ws.onopen = () => {
-          console.log('Real-time conversation WebSocket connected');
+          logger.chat('Real-time conversation WebSocket connected');
           this.reconnectAttempts = 0;
           resolve();
         };
@@ -220,21 +221,21 @@ export class RealTimeConversationService {
         this.ws.onmessage = (event) => {
           try {
             const message = JSON.parse(event.data);
-            console.log("handled event q------------------");
+            logger.chat("handled event q------------------");
             
             this.handleMessage(message);
           } catch (error) {
-            console.error('Error parsing WebSocket message:', error);
+            logger.error('Error parsing WebSocket message:', error);
           }
         };
 
         this.ws.onclose = () => {
-          console.log('Real-time conversation WebSocket disconnected');
+          logger.chat('Real-time conversation WebSocket disconnected');
           this.handleReconnect(conversationId);
         };
 
         this.ws.onerror = (error) => {
-          console.error('Real-time conversation WebSocket error:', error);
+          logger.error('Real-time conversation WebSocket error:', error);
           reject(error);
         };
       } catch (error) {
@@ -277,7 +278,7 @@ export class RealTimeConversationService {
         timestamp: new Date().toISOString()
       }));
     } else {
-      console.error('WebSocket is not connected');
+      logger.error('WebSocket is not connected');
     }
   }
 
@@ -301,13 +302,13 @@ export class RealTimeConversationService {
   private handleReconnect(conversationId: string): void {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
-      console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+      logger.chat(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
       
       setTimeout(() => {
-        this.connect(conversationId).catch(console.error);
+        this.connect(conversationId).catch(logger.error);
       }, this.reconnectInterval * this.reconnectAttempts);
     } else {
-      console.error('Max reconnection attempts reached');
+      logger.error('Max reconnection attempts reached');
     }
   }
 }

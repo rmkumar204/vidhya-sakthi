@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger';
+
 interface PerformanceMetrics {
   callSetupTime: number;
   connectionTime: number;
@@ -128,7 +130,7 @@ export class CallPerformanceMonitor {
       });
 
     } catch (error) {
-      console.error('Error collecting call stats:', error);
+      logger.error('Error collecting call stats:', error);
     }
   }
 
@@ -147,14 +149,14 @@ export class CallPerformanceMonitor {
 
   private logMetrics(): void {
     console.group('📊 Call Performance Metrics');
-    console.log('Call Setup Time:', this.metrics.callSetupTime, 'ms');
-    console.log('Connection Time:', this.metrics.connectionTime, 'ms');
-    console.log('Audio Quality:', this.metrics.audioQuality.toFixed(1), '%');
-    console.log('Video Quality:', this.metrics.videoQuality.toFixed(1), '%');
-    console.log('Packet Loss:', this.metrics.packetLoss.toFixed(2), '%');
-    console.log('Jitter:', this.metrics.jitter.toFixed(2), 'ms');
-    console.log('Latency:', this.metrics.latency.toFixed(2), 'ms');
-    console.log('Total Events:', this.events.length);
+    logger.performance('Call Setup Time:', this.metrics.callSetupTime, 'ms');
+    logger.performance('Connection Time:', this.metrics.connectionTime, 'ms');
+    logger.performance('Audio Quality:', this.metrics.audioQuality.toFixed(1), '%');
+    logger.performance('Video Quality:', this.metrics.videoQuality.toFixed(1), '%');
+    logger.performance('Packet Loss:', this.metrics.packetLoss.toFixed(2), '%');
+    logger.performance('Jitter:', this.metrics.jitter.toFixed(2), 'ms');
+    logger.performance('Latency:', this.metrics.latency.toFixed(2), 'ms');
+    logger.performance('Total Events:', this.events.length);
     console.groupEnd();
 
     // Send metrics to analytics service if available
@@ -181,7 +183,7 @@ export class CallPerformanceMonitor {
       
       localStorage.setItem('callAnalytics', JSON.stringify(existingData));
     } catch (error) {
-      console.error('Error saving analytics data:', error);
+      logger.error('Error saving analytics data:', error);
     }
   }
 

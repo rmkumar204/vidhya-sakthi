@@ -8,6 +8,7 @@ import { createConnectionRequest } from '@/react-app/services/ConnectionRequestS
 import { BookOpenIcon, CheckIcon, UsersIcon, AcademicCapIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
+import { logger } from '@/react-app/utils/logger';
 
 const menteeStats = [
   { title: 'Topics Subscribed', value: '0', change: 'Start exploring', changeType: 'neutral' as const, icon: BookOpenIcon, iconColor: 'bg-blue-500' },
@@ -50,15 +51,15 @@ export default function MenteeDashboard() {
     setConnectingProject(projectId);
     
     try {
-      console.log({projects, projectId});
+      logger.info({projects, projectId});
 
-      console.log(projects[0]._id);
+      logger.info(projects[0]._id);
       
       
       // Find the project to get mentor info
       const project = projects.find(p => p._id === projectId);
 
-      console.log({project});
+      logger.info({project});
       
       if (!project || !project.mentor) {
         toast.error('Project or mentor not found');
@@ -79,7 +80,7 @@ export default function MenteeDashboard() {
         icon: '🚀',
       });
     } catch (error: any) {
-      console.error('Failed to connect to project:', error);
+      logger.error('Failed to connect to project:', error);
       if (error.message.includes('pending request')) {
         toast.error('You already have a pending request for this project');
       } else {

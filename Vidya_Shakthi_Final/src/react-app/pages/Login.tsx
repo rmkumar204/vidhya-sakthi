@@ -5,6 +5,7 @@ import { UserRoleType } from '@/shared/types';
 import { User } from '../contexts/AuthContext.types';
 import ThemeToggle from '@/react-app/components/ThemeToggle';
 import { ArrowLeft, LogIn, Mail, Lock, Eye, EyeOff, Send } from 'lucide-react';
+import { logger } from '@/react-app/utils/logger';
 
 const roleDescriptions = {
   mentor: {
@@ -78,7 +79,7 @@ export default function Login() {
       setIsLoading(true);
       await redirectToLogin();
     } catch (error) {
-      console.error('Google login failed:', error);
+      logger.error('Google login failed:', error);
       setErrors({ google: 'Google login failed. Please try again.' });
     } finally {
       setIsLoading(false);
@@ -125,7 +126,7 @@ export default function Login() {
     //     avatar: '🧑‍🏫',
     //     password : formData.password,
     //   };
-    //   // console.log(formData)
+    //   // logger.auth(formData)
     //   login(mockUser);
     // } catch {
     //   setErrors({ email: 'Login failed. Please check your credentials.' });

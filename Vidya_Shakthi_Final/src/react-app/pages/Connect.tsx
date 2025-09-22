@@ -3,6 +3,7 @@ import { useAuth } from '@/react-app/hooks/useAuth';
 import { getMentors, createGuidanceConnectionRequest, type Mentor } from '@/react-app/services/GuidanceConnectionService';
 import { MagnifyingGlassIcon, UserIcon, ClockIcon, CheckIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { logger } from '@/react-app/utils/logger';
 
 interface ConnectingStates {
   [mentorId: string]: boolean;
@@ -45,7 +46,7 @@ const Connect: React.FC = () => {
       setHasNextPage(response.pagination.hasNextPage);
       setTotalCount(response.pagination.totalCount);
     } catch (error: any) {
-      console.error('Failed to fetch mentors:', error);
+      logger.error('Failed to fetch mentors:', error);
       toast.error(error.message || 'Failed to load mentors');
     } finally {
       setLoading(false);
@@ -79,7 +80,7 @@ const Connect: React.FC = () => {
         icon: '🚀',
       });
     } catch (error: any) {
-      console.error('Failed to connect with mentor:', error);
+      logger.error('Failed to connect with mentor:', error);
       if (error.message.includes('pending')) {
         toast.error('You already have a pending request with this mentor');
       } else {

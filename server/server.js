@@ -1,5 +1,6 @@
 const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
+const { logger } = require('./config/logger');
 
 class SignalingServer {
   constructor(port = 8080) {
@@ -16,7 +17,7 @@ class SignalingServer {
       verifyClient: (info) => {
         // Allow CORS from any origin for development
         const origin = info.origin;
-        console.log('WebSocket connection attempt from origin:', origin);
+        logger.websocket('WebSocket connection attempt', { origin });
         return true; // Accept all origins for development
       },
       // Add additional server options for better cross-browser compatibility
@@ -30,13 +31,17 @@ class SignalingServer {
       const userId = url.searchParams.get('userId');
       
       if (!userId) {
+        logger.websocket('Connection rejected: User ID required');
         ws.close(1008, 'User ID required');
         return;
       }
 
-      console.log(`User ${userId} connected`);
+      logger.websocket('User connected', { 
+        userId, 
+        totalUsers: this.clients.size + 1,
+        connectedUsers: Array.from(this.clients.keys())
+      });
       this.clients.set(userId, ws);
-      console.log(`📋 Total connected users: ${this.clients.size}`, Array.from(this.clients.keys()));
 
       // Send connection confirmation
       ws.send(JSON.stringify({
@@ -46,38 +51,57 @@ class SignalingServer {
 
       ws.on('message', (data) => {
         try {
-          console.log("========================================= ws message");
           const message = JSON.parse(data.toString());
-          console.log(`📨 Received message from ${userId}:`, message);
+          logger.websocket('Message received', { 
+            userId, 
+            messageType: message.type,
+            messageSize: data.length
+          });
           this.handleMessage(userId, message);
         } catch (error) {
-          console.error('Error parsing message:', error);
+          logger.error('Error parsing WebSocket message', { 
+            userId, 
+            error: error.message,
+            data: data.toString().substring(0, 100) // Log first 100 chars for debugging
+          });
         }
       });
 
       ws.on('close', () => {
-        console.log(`User ${userId} disconnected`);
+        logger.websocket('User disconnected', { 
+          userId, 
+          remainingUsers: this.clients.size - 1,
+          connectedUsers: Array.from(this.clients.keys()).filter(id => id !== userId)
+        });
         this.clients.delete(userId);
-        console.log(`📋 Remaining connected users: ${this.clients.size}`, Array.from(this.clients.keys()));
         this.broadcastUserLeft(userId);
       });
 
       ws.on('error', (error) => {
-        console.error(`WebSocket error for user ${userId}:`, error);
+        logger.error('WebSocket error', { 
+          userId, 
+          error: error.message,
+          stack: error.stack
+        });
       });
 
       // Broadcast user joined
       this.broadcastUserJoined(userId);
     });
 
-    console.log(`Signaling server running on port ${this.port}`);
+    logger.info(`Signaling server running on port ${this.port}`, { 
+      port: this.port,
+      environment: process.env.NODE_ENV || 'development'
+    });
   }
 
   handleMessage(fromUserId, message) {
-    
-    console.log("=========================================handleMessage");
     const { type, payload, to } = message;
-    console.log("=========================================handleMessage", type);
+    logger.signaling('Handling message', { 
+      fromUserId, 
+      messageType: type,
+      to
+    });
 
     // Store the 'to' field for use in handlers
     this.currentMessageTo = to;
@@ -147,12 +171,12 @@ class SignalingServer {
         this.handleScheduledMessage(fromUserId, payload);
         break;
       default:
-        console.log(`⚠️ Unknown message type: ${type}`);
+        logger.debug(`⚠️ Unknown message type: ${type}`);
     }
   }
 
   handleChatMessage(fromUserId, payload) {
-    console.log(`💬 Handling chat message from ${fromUserId}:`, payload);
+    logger.debug(`💬 Handling chat message from ${fromUserId}:`, payload);
     const { chatId, content, type, senderId, senderName } = payload;
     
     // Create message with server timestamp and unique ID
@@ -167,7 +191,7 @@ class SignalingServer {
       timestamp: new Date().toISOString()
     };
 
-    console.log(`📤 Broadcasting message to chat ${chatId}:`, message);
+    logger.debug(`📤 Broadcasting message to chat ${chatId}:`, message);
     // Broadcast to all users in the chat
     this.broadcastToChatMembers(chatId, fromUserId, {
       type: 'message',
@@ -178,7 +202,7 @@ class SignalingServer {
   handleTypingIndicator(fromUserId, payload) {
     const { chatId, isTyping } = payload;
     
-    console.log(`⌨️ Typing indicator from ${fromUserId} in chat ${chatId}: ${isTyping}`);
+    logger.debug(`⌨️ Typing indicator from ${fromUserId} in chat ${chatId}: ${isTyping}`);
     
     // Broadcast typing indicator to other chat members
     this.broadcastToChatMembers(chatId, fromUserId, {
@@ -226,14 +250,14 @@ class SignalingServer {
   }
 
   handleCallAccept(fromUserId, payload) {
-    console.log("✅ Handling call accept from", fromUserId, ":", payload);
+    logger.debug("✅ Handling call accept from", fromUserId, ":", payload);
     const { callId, targetUserId, toUserId } = payload;
     
     // Support multiple ways to get target user ID
     const targetUser = this.currentMessageTo || targetUserId || toUserId;
     
     if (!targetUser) {
-      console.error("❌ No target user ID found in call accept. Checked:", {
+      logger.error("❌ No target user ID found in call accept. Checked:", {
         messageTo: this.currentMessageTo,
         targetUserId,
         toUserId,
@@ -242,11 +266,11 @@ class SignalingServer {
       return;
     }
     
-    console.log("🎯 Target user for call accept:", targetUser);
+    logger.debug("🎯 Target user for call accept:", targetUser);
     
     const targetClient = this.clients.get(targetUser);
     if (targetClient && targetClient.readyState === WebSocket.OPEN) {
-      console.log("📤 Sending call accept to user", targetUser);
+      logger.debug("📤 Sending call accept to user", targetUser);
       targetClient.send(JSON.stringify({
         type: 'call_accept',
         payload: {
@@ -255,10 +279,10 @@ class SignalingServer {
           timestamp: new Date().toISOString()
         }
       }));
-      console.log("✅ Call accept sent successfully to", targetUser);
+      logger.debug("✅ Call accept sent successfully to", targetUser);
     } else {
-      console.error("❌ Target user", targetUser, "not connected or WebSocket not open. ReadyState:", targetClient?.readyState);
-      console.log("📋 Available connected users:", Array.from(this.clients.keys()));
+      logger.error("❌ Target user", targetUser, "not connected or WebSocket not open. ReadyState:", targetClient?.readyState);
+      logger.debug("📋 Available connected users:", Array.from(this.clients.keys()));
     }
   }
 
@@ -361,7 +385,7 @@ class SignalingServer {
   }
 
   handleCallOffer(fromUserId, payload) {
-    console.log("📞 Handling call offer from", fromUserId, ":", payload);
+    logger.debug("📞 Handling call offer from", fromUserId, ":", payload);
     const { targetUserId, toUserId, callId, offer, callType, fromUserName } = payload;
     
     // Support multiple ways to get target user ID:
@@ -371,7 +395,7 @@ class SignalingServer {
     const targetUser = this.currentMessageTo || targetUserId || toUserId;
     
     if (!targetUser) {
-      console.error("❌ No target user ID found in call offer. Checked:", {
+      logger.error("❌ No target user ID found in call offer. Checked:", {
         messageTo: this.currentMessageTo,
         targetUserId,
         toUserId,
@@ -380,11 +404,11 @@ class SignalingServer {
       return;
     }
     
-    console.log("🎯 Target user for call offer:", targetUser);
+    logger.debug("🎯 Target user for call offer:", targetUser);
     
     const targetClient = this.clients.get(targetUser);
     if (targetClient && targetClient.readyState === WebSocket.OPEN) {
-      console.log("📤 Sending call offer to user", targetUser);
+      logger.debug("📤 Sending call offer to user", targetUser);
       targetClient.send(JSON.stringify({
         type: 'call_offer',
         payload: {
@@ -396,22 +420,22 @@ class SignalingServer {
           timestamp: new Date().toISOString()
         }
       }));
-      console.log("✅ Call offer sent successfully to", targetUser);
+      logger.debug("✅ Call offer sent successfully to", targetUser);
     } else {
-      console.error("❌ Target user", targetUser, "not connected or WebSocket not open. ReadyState:", targetClient?.readyState);
-      console.log("📋 Available connected users:", Array.from(this.clients.keys()));
+      logger.error("❌ Target user", targetUser, "not connected or WebSocket not open. ReadyState:", targetClient?.readyState);
+      logger.debug("📋 Available connected users:", Array.from(this.clients.keys()));
     }
   }
 
   handleCallAnswer(fromUserId, payload) {
-    console.log("📞 Handling call answer from", fromUserId, ":", payload);
+    logger.debug("📞 Handling call answer from", fromUserId, ":", payload);
     const { targetUserId, toUserId, callId, answer } = payload;
     
     // Support multiple ways to get target user ID
     const targetUser = this.currentMessageTo || targetUserId || toUserId;
     
     if (!targetUser) {
-      console.error("❌ No target user ID found in call answer. Checked:", {
+      logger.error("❌ No target user ID found in call answer. Checked:", {
         messageTo: this.currentMessageTo,
         targetUserId,
         toUserId,
@@ -420,11 +444,11 @@ class SignalingServer {
       return;
     }
     
-    console.log("🎯 Target user for call answer:", targetUser);
+    logger.debug("🎯 Target user for call answer:", targetUser);
     
     const targetClient = this.clients.get(targetUser);
     if (targetClient && targetClient.readyState === WebSocket.OPEN) {
-      console.log("📤 Sending call answer to user", targetUser);
+      logger.debug("📤 Sending call answer to user", targetUser);
       targetClient.send(JSON.stringify({
         type: 'call_answer',
         payload: {
@@ -434,21 +458,21 @@ class SignalingServer {
           timestamp: new Date().toISOString()
         }
       }));
-      console.log("✅ Call answer sent successfully to", targetUser);
+      logger.debug("✅ Call answer sent successfully to", targetUser);
     } else {
-      console.error("❌ Target user", targetUser, "not connected or WebSocket not open. ReadyState:", targetClient?.readyState);
+      logger.error("❌ Target user", targetUser, "not connected or WebSocket not open. ReadyState:", targetClient?.readyState);
     }
   }
 
   handleIceCandidate(fromUserId, payload) {
-    console.log("🧊 Handling ICE candidate from", fromUserId, ":", payload);
+    logger.debug("🧊 Handling ICE candidate from", fromUserId, ":", payload);
     const { targetUserId, toUserId, callId, candidate } = payload;
     
     // Support multiple ways to get target user ID
     const targetUser = this.currentMessageTo || targetUserId || toUserId;
     
     if (!targetUser) {
-      console.error("❌ No target user ID found in ICE candidate. Checked:", {
+      logger.error("❌ No target user ID found in ICE candidate. Checked:", {
         messageTo: this.currentMessageTo,
         targetUserId,
         toUserId,
@@ -457,11 +481,11 @@ class SignalingServer {
       return;
     }
     
-    console.log("🎯 Target user for ICE candidate:", targetUser);
+    logger.debug("🎯 Target user for ICE candidate:", targetUser);
     
     const targetClient = this.clients.get(targetUser);
     if (targetClient && targetClient.readyState === WebSocket.OPEN) {
-      console.log("📤 Sending ICE candidate to user", targetUser);
+      logger.debug("📤 Sending ICE candidate to user", targetUser);
       targetClient.send(JSON.stringify({
         type: 'call_ice_candidate',
         payload: {
@@ -471,14 +495,14 @@ class SignalingServer {
           timestamp: new Date().toISOString()
         }
       }));
-      console.log("✅ ICE candidate sent successfully to", targetUser);
+      logger.debug("✅ ICE candidate sent successfully to", targetUser);
     } else {
-      console.error("❌ Target user", targetUser, "not connected or WebSocket not open. ReadyState:", targetClient?.readyState);
+      logger.error("❌ Target user", targetUser, "not connected or WebSocket not open. ReadyState:", targetClient?.readyState);
     }
   }
 
   handleCallEnd(fromUserId, payload) {
-    console.log(`🔚 Handling call_end from ${fromUserId}:`, payload);
+    logger.debug(`🔚 Handling call_end from ${fromUserId}:`, payload);
     
     // Extract target user ID from multiple possible sources:
     // 1. From message 'to' field (set by WebSocketService.sendMessage)
@@ -488,7 +512,7 @@ class SignalingServer {
     const callId = payload.callId;
     
     if (!targetUserId) {
-      console.error("❌ No target user ID found in call_end. Checked:", {
+      logger.error("❌ No target user ID found in call_end. Checked:", {
         messageTo: this.currentMessageTo,
         targetUserId: payload.targetUserId,
         toUserId: payload.toUserId,
@@ -497,7 +521,7 @@ class SignalingServer {
       return;
     }
     
-    console.log(`🎯 Target user for call_end: ${targetUserId}`);
+    logger.debug(`🎯 Target user for call_end: ${targetUserId}`);
     
     // Rate limit call_end messages to prevent infinite loops
     const now = Date.now();
@@ -505,16 +529,16 @@ class SignalingServer {
     const lastSent = this.callEndThrottle.get(throttleKey) || 0;
     
     if (now - lastSent < 1000) { // Only allow one call_end per second per user pair
-      console.log(`🛑 Throttling call_end from ${fromUserId} to ${targetUserId} - too frequent`);
+      logger.debug(`🛑 Throttling call_end from ${fromUserId} to ${targetUserId} - too frequent`);
       return;
     }
     
     this.callEndThrottle.set(throttleKey, now);
-    console.log(`📤 Processing call_end from ${fromUserId} to ${targetUserId}`);
+    logger.debug(`📤 Processing call_end from ${fromUserId} to ${targetUserId}`);
     
     const targetClient = this.clients.get(targetUserId);
     if (targetClient && targetClient.readyState === WebSocket.OPEN) {
-      console.log(`✅ Sending call_end to user ${targetUserId}`);
+      logger.debug(`✅ Sending call_end to user ${targetUserId}`);
       targetClient.send(JSON.stringify({
         type: 'call_end',
         payload: {
@@ -523,10 +547,10 @@ class SignalingServer {
           timestamp: new Date().toISOString()
         }
       }));
-      console.log(`✅ Call_end sent successfully to ${targetUserId}`);
+      logger.debug(`✅ Call_end sent successfully to ${targetUserId}`);
     } else {
-      console.error(`❌ Target user ${targetUserId} not connected or WebSocket not open. ReadyState:`, targetClient?.readyState);
-      console.log("📋 Available connected users:", Array.from(this.clients.keys()));
+      logger.error(`❌ Target user ${targetUserId} not connected or WebSocket not open. ReadyState:`, targetClient?.readyState);
+      logger.debug("📋 Available connected users:", Array.from(this.clients.keys()));
     }
     
     // Clean up old throttle entries
@@ -538,7 +562,7 @@ class SignalingServer {
   handleCallHistory(fromUserId, payload) {
     const { callId, duration, callType } = payload;
     
-    console.log(`📞 Call history logged: ${callId}, duration: ${duration}s, type: ${callType}`);
+    logger.debug(`📞 Call history logged: ${callId}, duration: ${duration}s, type: ${callType}`);
     
     // Broadcast call history to all connected clients for logging
     this.clients.forEach((client, userId) => {
@@ -558,14 +582,14 @@ class SignalingServer {
   }
 
   handleCallRinging(fromUserId, payload) {
-    console.log("🔔 Handling call ringing from", fromUserId, ":", payload);
+    logger.debug("🔔 Handling call ringing from", fromUserId, ":", payload);
     const { targetUserId, toUserId, callId } = payload;
     
     // Support multiple ways to get target user ID
     const targetUser = this.currentMessageTo || targetUserId || toUserId;
     
     if (!targetUser) {
-      console.error("❌ No target user ID found in call ringing. Checked:", {
+      logger.error("❌ No target user ID found in call ringing. Checked:", {
         messageTo: this.currentMessageTo,
         targetUserId,
         toUserId,
@@ -574,11 +598,11 @@ class SignalingServer {
       return;
     }
     
-    console.log("🎯 Target user for call ringing:", targetUser);
+    logger.debug("🎯 Target user for call ringing:", targetUser);
     
     const targetClient = this.clients.get(targetUser);
     if (targetClient && targetClient.readyState === WebSocket.OPEN) {
-      console.log("📤 Sending call ringing to user", targetUser);
+      logger.debug("📤 Sending call ringing to user", targetUser);
       targetClient.send(JSON.stringify({
         type: 'call_ringing',
         payload: {
@@ -587,21 +611,21 @@ class SignalingServer {
           timestamp: new Date().toISOString()
         }
       }));
-      console.log("✅ Call ringing sent successfully to", targetUser);
+      logger.debug("✅ Call ringing sent successfully to", targetUser);
     } else {
-      console.error("❌ Target user", targetUser, "not connected or WebSocket not open. ReadyState:", targetClient?.readyState);
+      logger.error("❌ Target user", targetUser, "not connected or WebSocket not open. ReadyState:", targetClient?.readyState);
     }
   }
 
   handleCallMuteStatus(fromUserId, payload) {
-    console.log("🎤 Handling mute status from", fromUserId, ":", payload);
+    logger.debug("🎤 Handling mute status from", fromUserId, ":", payload);
     const { targetUserId, toUserId, isMuted, userId } = payload;
     
     // Support multiple ways to get target user ID
     const targetUser = this.currentMessageTo || targetUserId || toUserId;
     
     if (!targetUser) {
-      console.error("❌ No target user ID found in mute status. Checked:", {
+      logger.error("❌ No target user ID found in mute status. Checked:", {
         messageTo: this.currentMessageTo,
         targetUserId,
         toUserId,
@@ -610,11 +634,11 @@ class SignalingServer {
       return;
     }
     
-    console.log("🎯 Target user for mute status:", targetUser);
+    logger.debug("🎯 Target user for mute status:", targetUser);
     
     const targetClient = this.clients.get(targetUser);
     if (targetClient && targetClient.readyState === WebSocket.OPEN) {
-      console.log("📤 Sending mute status to user", targetUser);
+      logger.debug("📤 Sending mute status to user", targetUser);
       targetClient.send(JSON.stringify({
         type: 'call_mute_status',
         payload: {
@@ -623,21 +647,21 @@ class SignalingServer {
           timestamp: new Date().toISOString()
         }
       }));
-      console.log("✅ Mute status sent successfully to", targetUser);
+      logger.debug("✅ Mute status sent successfully to", targetUser);
     } else {
-      console.error("❌ Target user", targetUser, "not connected or WebSocket not open. ReadyState:", targetClient?.readyState);
+      logger.error("❌ Target user", targetUser, "not connected or WebSocket not open. ReadyState:", targetClient?.readyState);
     }
   }
 
   handleCallVideoStatus(fromUserId, payload) {
-    console.log("📹 Handling video status from", fromUserId, ":", payload);
+    logger.debug("📹 Handling video status from", fromUserId, ":", payload);
     const { targetUserId, toUserId, videoEnabled, userId } = payload;
     
     // Support multiple ways to get target user ID
     const targetUser = this.currentMessageTo || targetUserId || toUserId;
     
     if (!targetUser) {
-      console.error("❌ No target user ID found in video status. Checked:", {
+      logger.error("❌ No target user ID found in video status. Checked:", {
         messageTo: this.currentMessageTo,
         targetUserId,
         toUserId,
@@ -646,11 +670,11 @@ class SignalingServer {
       return;
     }
     
-    console.log("🎯 Target user for video status:", targetUser);
+    logger.debug("🎯 Target user for video status:", targetUser);
     
     const targetClient = this.clients.get(targetUser);
     if (targetClient && targetClient.readyState === WebSocket.OPEN) {
-      console.log("📤 Sending video status to user", targetUser);
+      logger.debug("📤 Sending video status to user", targetUser);
       targetClient.send(JSON.stringify({
         type: 'call_video_status',
         payload: {
@@ -659,43 +683,43 @@ class SignalingServer {
           timestamp: new Date().toISOString()
         }
       }));
-      console.log("✅ Video status sent successfully to", targetUser);
+      logger.debug("✅ Video status sent successfully to", targetUser);
     } else {
-      console.error("❌ Target user", targetUser, "not connected or WebSocket not open. ReadyState:", targetClient?.readyState);
+      logger.error("❌ Target user", targetUser, "not connected or WebSocket not open. ReadyState:", targetClient?.readyState);
     }
   }
 
   handleScheduledMessage(fromUserId, payload) {
-    console.log(`📅 Handling scheduled message from ${fromUserId}:`, payload);
+    logger.debug(`📅 Handling scheduled message from ${fromUserId}:`, payload);
     // For now, treat scheduled messages like regular messages
     // In a real implementation, you'd store them and send at the scheduled time
     this.handleChatMessage(fromUserId, payload);
   }
 
   broadcastToChatMembers(chatId, excludeUserId, message) {
-    console.log(`📡 Broadcasting to chat ${chatId}, excluding ${excludeUserId}:`, message);
-    console.log(`👥 Connected clients: ${Array.from(this.clients.keys()).join(', ')}`);
+    logger.debug(`📡 Broadcasting to chat ${chatId}, excluding ${excludeUserId}:`, message);
+    logger.debug(`👥 Connected clients: ${Array.from(this.clients.keys()).join(', ')}`);
     
     // For simplicity, we'll broadcast to all connected users except the sender
     // In a real app, you'd maintain chat membership data
     let broadcastCount = 0;
     this.clients.forEach((client, userId) => {
       if (userId !== excludeUserId && client.readyState === WebSocket.OPEN) {
-        console.log(`📨 Sending to user ${userId} for chat ${chatId}`);
+        logger.debug(`📨 Sending to user ${userId} for chat ${chatId}`);
         try {
           client.send(JSON.stringify(message));
           broadcastCount++;
-          console.log(`✅ Successfully sent to user ${userId}`);
+          logger.debug(`✅ Successfully sent to user ${userId}`);
         } catch (error) {
-          console.error(`❌ Failed to send to user ${userId}:`, error);
+          logger.error(`❌ Failed to send to user ${userId}:`, error);
         }
       } else if (userId === excludeUserId) {
-        console.log(`⏭️ Skipping sender ${userId}`);
+        logger.debug(`⏭️ Skipping sender ${userId}`);
       } else {
-        console.log(`❌ User ${userId} not ready (state: ${client.readyState})`);
+        logger.debug(`❌ User ${userId} not ready (state: ${client.readyState})`);
       }
     });
-    console.log(`✅ Message broadcasted to ${broadcastCount} clients`);
+    logger.debug(`✅ Message broadcasted to ${broadcastCount} clients`);
   }
 
   broadcastUserJoined(userId) {
@@ -730,15 +754,17 @@ const server = new SignalingServer(process.env.PORT || 8080);
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
+  logger.info('SIGTERM received, shutting down gracefully');
   server.wss.close(() => {
+    logger.info('Server shutdown complete');
     process.exit(0);
   });
 });
 
 process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully');
+  logger.info('SIGINT received, shutting down gracefully');
   server.wss.close(() => {
+    logger.info('Server shutdown complete');
     process.exit(0);
   });
 });

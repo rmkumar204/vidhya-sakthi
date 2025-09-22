@@ -18,6 +18,7 @@ import { messagingService, Message, Chat, Connection } from '@/react-app/service
 import { webSocketService } from '@/react-app/services/WebSocketService';
 import { getConversations, getConversation, sendMessage as sendConversationMessage, Conversation, ConversationMessage } from '@/react-app/services/ConversationService';
 import toast from 'react-hot-toast';
+import { logger } from '@/react-app/utils/logger';
 
 // Enhanced utility function to render formatted text
 const renderFormattedText = (text: string) => {
@@ -80,7 +81,7 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
     // Cleanup function - remove all listeners
     return () => {
       // Note: WebSocket service should handle cleanup when disconnecting
-      console.log('🧹 Cleaning up EnhancedMessages component');
+      logger.chat('🧹 Cleaning up EnhancedMessages component');
     };
   }, [user?.id]);
 
@@ -100,7 +101,7 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
       
       // Check and set initial connection status
       const currentStatus = webSocketService.isConnected() ? 'connected' : 'disconnected';
-      console.log('🔌 Initial WebSocket connection status:', currentStatus);
+      logger.chat('🔌 Initial WebSocket connection status:', currentStatus);
       setConnectionStatus(currentStatus);
       
       // Load initial data
@@ -108,7 +109,7 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
       loadConversations();
       
     } catch (error) {
-      console.error('Error initializing services:', error);
+      logger.error('Error initializing services:', error);
       toast.error('Failed to connect to messaging service');
     } finally {
       setIsLoading(false);
@@ -135,33 +136,33 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
 
     // WebSocket connection status
     const connectionStatusHandler = (status: any) => {
-      console.log('🔌 WebSocket connection status:', status);
+      logger.chat('🔌 WebSocket connection status:', status);
       setConnectionStatus(status.status);
     };
 
     const connectedHandler = () => {
-      console.log('✅ WebSocket connected');
+      logger.chat('✅ WebSocket connected');
       setConnectionStatus('connected');
     };
 
     const disconnectedHandler = () => {
-      console.log('❌ WebSocket disconnected');
+      logger.chat('❌ WebSocket disconnected');
       setConnectionStatus('disconnected');
     };
 
     const connectionEstablishedHandler = (payload: any) => {
-      console.log('🔌 Server connection established:', payload);
+      logger.chat('🔌 Server connection established:', payload);
       setConnectionStatus('connected');
     };
 
     const messageHandler = (payload: any) => {
-      console.log("------===------------------------------------------------------msg");
+      logger.chat("------===------------------------------------------------------msg");
       
-      console.log('📨 Received WebSocket message:', payload);
+      logger.chat('📨 Received WebSocket message:', payload);
       
       // Skip if this is our own message (to prevent duplicates from sender)
       if (payload.senderId === user?.id) {
-        console.log('Skipping own message to prevent duplicate');
+        logger.chat('Skipping own message to prevent duplicate');
         return;
       }
       
@@ -180,7 +181,7 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
         isDelivered: true
       };
       
-      console.log('🔍 WebSocket message details:', {
+      logger.chat('🔍 WebSocket message details:', {
         id: newMessage.id,
         content: newMessage.content,
         senderId: newMessage.senderId,
@@ -190,9 +191,9 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
       
       // Always add to messages if it's for the current chat
       if (payload.chatId === selectedChatRef.current) {
-        console.log('✅ Chat ID matches, adding message to current chat');
+        logger.chat('✅ Chat ID matches, adding message to current chat');
         setMessages(prev => {
-          console.log('📝 Current messages before update:', prev.length);
+          logger.chat('📝 Current messages before update:', prev.length);
           
           // Check if message already exists by ID or content+timestamp (more robust)
           const exists = prev.some(msg => 
@@ -202,13 +203,13 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
              Math.abs(new Date(msg.timestamp).getTime() - new Date(newMessage.timestamp).getTime()) < 1000)
           );
           if (exists) {
-            console.log('⚠️ Message already exists, skipping:', newMessage.id);
+            logger.chat('⚠️ Message already exists, skipping:', newMessage.id);
             return prev;
           }
           
-          console.log('➕ Adding new message to current chat:', newMessage);
+          logger.chat('➕ Adding new message to current chat:', newMessage);
           const updatedMessages = [...prev, newMessage];
-          console.log('📊 Updated messages array:', updatedMessages.length, 'messages');
+          logger.chat('📊 Updated messages array:', updatedMessages.length, 'messages');
           
           // Note: Message persistence is handled by the messaging service when messages are sent
           // We don't need to store incoming WebSocket messages separately
@@ -219,8 +220,8 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
         });
         scrollToBottom();
       } else {
-        console.log('❌ Chat ID does not match, not adding to current chat');
-        console.log('🔍 Debug info:', {
+        logger.chat('❌ Chat ID does not match, not adding to current chat');
+        logger.chat('🔍 Debug info:', {
           payloadChatId: payload.chatId,
           selectedChat: selectedChat,
           selectedChatType: typeof selectedChat,
@@ -228,14 +229,14 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
         });
         
         // If still no match, try to add the message anyway for debugging
-        console.log('🚨 FALLBACK: Adding message despite chat ID mismatch');
+        logger.chat('🚨 FALLBACK: Adding message despite chat ID mismatch');
         setMessages(prev => {
           const exists = prev.some(msg => msg.id === newMessage.id);
           if (exists) {
-            console.log('⚠️ Message already exists in fallback, skipping');
+            logger.chat('⚠️ Message already exists in fallback, skipping');
             return prev;
           }
-          console.log('➕ FALLBACK: Adding message to current chat');
+          logger.chat('➕ FALLBACK: Adding message to current chat');
           return [...prev, newMessage];
         });
         scrollToBottom();
@@ -244,19 +245,19 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
       // FALLBACK: If chat ID doesn't match but we have a selected chat, 
       // check if this message should be displayed in the current chat
       if (payload.chatId !== selectedChat && selectedChat) {
-        console.log('🔄 FALLBACK: Chat ID mismatch, checking if message should be displayed');
+        logger.chat('🔄 FALLBACK: Chat ID mismatch, checking if message should be displayed');
         
         // Check if the message is from a participant in the current chat
         const currentChat = chats.find(chat => chat.id === selectedChat);
         if (currentChat && currentChat.participants.includes(payload.senderId)) {
-          console.log('✅ FALLBACK: Message is from current chat participant, adding to display');
+          logger.chat('✅ FALLBACK: Message is from current chat participant, adding to display');
           setMessages(prev => {
             const exists = prev.some(msg => msg.id === newMessage.id);
             if (exists) {
-              console.log('⚠️ Message already exists in fallback add, skipping');
+              logger.chat('⚠️ Message already exists in fallback add, skipping');
               return prev;
             }
-            console.log('➕ FALLBACK: Adding message to current chat');
+            logger.chat('➕ FALLBACK: Adding message to current chat');
             
             // Note: Message persistence is handled by the messaging service when messages are sent
             
@@ -264,21 +265,21 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
           });
           scrollToBottom();
         } else {
-          console.log('❌ FALLBACK: Message is not from current chat participant');
+          logger.chat('❌ FALLBACK: Message is not from current chat participant');
           
           // Additional fallback: Check if this is a conversation message
           const currentConversation = conversations.find(conv => conv._id === selectedChat);
           if (currentConversation && currentConversation.participants.some(p => 
             (typeof p === 'string' ? p : p._id) === payload.senderId
           )) {
-            console.log('✅ CONVERSATION FALLBACK: Message is from conversation participant, adding to display');
+            logger.chat('✅ CONVERSATION FALLBACK: Message is from conversation participant, adding to display');
             setMessages(prev => {
               const exists = prev.some(msg => msg.id === newMessage.id);
               if (exists) {
-                console.log('⚠️ Message already exists in conversation fallback, skipping');
+                logger.chat('⚠️ Message already exists in conversation fallback, skipping');
                 return prev;
               }
-              console.log('➕ CONVERSATION FALLBACK: Adding message to current conversation');
+              logger.chat('➕ CONVERSATION FALLBACK: Adding message to current conversation');
               
               // Note: Message persistence is handled by the messaging service when messages are sent
               
@@ -286,7 +287,7 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
             });
             scrollToBottom();
           } else {
-            console.log('❌ CONVERSATION FALLBACK: Message is not from conversation participant');
+            logger.chat('❌ CONVERSATION FALLBACK: Message is not from conversation participant');
           }
         }
       }
@@ -308,7 +309,7 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
         // If chat doesn't exist, we might need to create it
         const chatExists = updatedChats.some(chat => chat.id === payload.chatId);
         if (!chatExists) {
-          console.log('Chat not found, creating new chat entry');
+          logger.chat('Chat not found, creating new chat entry');
           // This might need to be handled differently depending on your chat creation logic
         }
         
@@ -317,12 +318,12 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
     };
 
     const typingHandler = (payload: any) => {
-      console.log('⌨️ Received typing indicator:', payload);
-      console.log(payload.chatId, selectedChatRef.current, payload.userId ,user?.id);
+      logger.chat('⌨️ Received typing indicator:', payload);
+      logger.chat(payload.chatId, selectedChatRef.current, payload.userId ,user?.id);
       
       // Check if this is actually a message disguised as a typing indicator
       if (payload.content && !payload.isTyping) {
-        console.log('🚨 FOUND MESSAGE DISGUISED AS TYPING INDICATOR:', payload);
+        logger.chat('🚨 FOUND MESSAGE DISGUISED AS TYPING INDICATOR:', payload);
         // Treat this as a message
         const newMessage: Message = {
           id: payload.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -352,13 +353,13 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
       
       // If no chat is selected, try to auto-select the chat
       if (!selectedChatRef.current && payload.chatId) {
-        console.log('🚨 No chat selected for typing indicator, auto-selecting:', payload.chatId);
+        logger.chat('🚨 No chat selected for typing indicator, auto-selecting:', payload.chatId);
         selectedChatRef.current = payload.chatId;
         setSelectedChat(payload.chatId);
       }
       
       if (payload.chatId === selectedChatRef.current && payload.userId !== user?.id) {
-        console.log('Setting typing indicator:', payload.isTyping);
+        logger.chat('Setting typing indicator:', payload.isTyping);
         setIsUserTyping(payload.isTyping);
         // Force UI update
         setForceUpdate(prev => prev + 1);
@@ -372,7 +373,7 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
         }
       } else {
         // Fallback: show typing indicator even if chat ID doesn't match
-        console.log('🚨 FALLBACK: Showing typing indicator despite chat ID mismatch');
+        logger.chat('🚨 FALLBACK: Showing typing indicator despite chat ID mismatch');
         setIsUserTyping(payload.isTyping);
         setForceUpdate(prev => prev + 1);
         
@@ -387,7 +388,7 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
 
     // Handle incoming call notifications
     webSocketService.on('call_initiate', (payload: any) => {
-      console.log('📞 Received call initiation:', payload);
+      logger.chat('📞 Received call initiation:', payload);
       if (payload.toUserId === user?.id) {
         // Show incoming call notification
         toast.success(`Incoming ${payload.callType} call from ${payload.fromUserName}`);
@@ -397,25 +398,25 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
 
     // Handle call acceptance
     webSocketService.on('call_accept', (payload: any) => {
-      console.log('✅ Call accepted:', payload);
+      logger.chat('✅ Call accepted:', payload);
       toast.success('Call accepted');
     });
 
     // Handle call rejection
     webSocketService.on('call_reject', (payload: any) => {
-      console.log('❌ Call rejected:', payload);
+      logger.chat('❌ Call rejected:', payload);
       toast.error('Call rejected');
     });
 
     // Handle call end
     webSocketService.on('call_end', (payload: any) => {
-      console.log('📞 Call ended:', payload);
+      logger.chat('📞 Call ended:', payload);
       toast.success('Call ended');
     });
 
     // Handle call history messages
     webSocketService.on('call_history', (payload: any) => {
-      console.log('📞 Call history received:', payload);
+      logger.chat('📞 Call history received:', payload);
       
       // Create a detailed call history message
       const callType = payload.callType === 'video' ? 'Video' : 'Audio';
@@ -441,13 +442,13 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
         isDelivered: true
       };
 
-      console.log('📞 Adding call history message:', callHistoryMessage);
-      console.log('📞 Current selected chat:', selectedChat);
-      console.log('📞 Message chatId:', callHistoryMessage.chatId);
+      logger.chat('📞 Adding call history message:', callHistoryMessage);
+      logger.chat('📞 Current selected chat:', selectedChat);
+      logger.chat('📞 Message chatId:', callHistoryMessage.chatId);
 
       // Add to messages in the current chat
       setMessages(prev => {
-        console.log('📞 Current messages count:', prev.length);
+        logger.chat('📞 Current messages count:', prev.length);
         // Enhanced duplicate checking - check by ID, callId, and content
         const exists = prev.some(msg => 
           msg.id === callHistoryMessage.id || 
@@ -456,13 +457,13 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
            Math.abs(new Date(msg.timestamp).getTime() - new Date(callHistoryMessage.timestamp).getTime()) < 5000) // within 5 seconds
         );
         if (exists) {
-          console.log('Call history message already exists, skipping');
+          logger.chat('Call history message already exists, skipping');
           return prev;
         }
         
-        console.log('📞 Adding call history message to state. New count:', prev.length + 1);
+        logger.chat('📞 Adding call history message to state. New count:', prev.length + 1);
         const newMessages = [...prev, callHistoryMessage];
-        console.log('📞 New messages:', newMessages);
+        logger.chat('📞 New messages:', newMessages);
         return newMessages;
       });
     });
@@ -493,9 +494,9 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
     try {
       const response = await getConversations({ page: 1, limit: 50 }, user.token);
       setConversations(response.conversations);
-      console.log('Loaded conversations:', response.conversations);
+      logger.chat('Loaded conversations:', response.conversations);
     } catch (error) {
-      console.error('Error loading conversations:', error);
+      logger.error('Error loading conversations:', error);
       toast.error('Failed to load conversations');
     }
   };
@@ -516,16 +517,16 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
     if (!user?.token) return;
     
     try {
-      console.log('Loading conversation messages for:', conversationId);
+      logger.chat('Loading conversation messages for:', conversationId);
       const response = await getConversation(conversationId, { page: 1, limit: 100 }, user.token);
-      console.log('API Response:', response);
+      logger.chat('API Response:', response);
       
       // Check if response has the expected structure
       if (!response || !response.conversation || !response.conversation.messages) {
-        console.error('Invalid response structure:', response);
-        console.error('Response keys:', response ? Object.keys(response) : 'null');
+        logger.error('Invalid response structure:', response);
+        logger.error('Response keys:', response ? Object.keys(response) : 'null');
         if (response?.conversation) {
-          console.error('Conversation keys:', Object.keys(response.conversation));
+          logger.error('Conversation keys:', Object.keys(response.conversation));
         }
         toast.error('Invalid conversation data received');
         return;
@@ -533,7 +534,7 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
       
       // Convert ConversationMessage to Message format
       const messagesArray = response.conversation.messages || [];
-      console.log('Messages array:', messagesArray);
+      logger.chat('Messages array:', messagesArray);
       
       const convertedMessages: Message[] = messagesArray.map((msg: ConversationMessage) => ({
         id: msg._id,
@@ -551,14 +552,14 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
       }));
       
       setMessages(convertedMessages);
-      console.log('Loaded conversation messages:', convertedMessages);
+      logger.chat('Loaded conversation messages:', convertedMessages);
       
       // Auto-scroll to bottom after loading messages
       setTimeout(() => {
         scrollToBottom();
       }, 200);
     } catch (error: any) {
-      console.error('Error loading conversation messages:', error);
+      logger.error('Error loading conversation messages:', error);
       
       // Handle different types of errors
       if (error.message?.includes('404') || error.message?.includes('not found')) {
@@ -655,10 +656,10 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
           // Check if message already exists to prevent duplicates
           const exists = prev.some(msg => msg.id === newMessage.id);
           if (exists) {
-            console.log('Conversation message already exists, skipping:', newMessage.id);
+            logger.chat('Conversation message already exists, skipping:', newMessage.id);
             return prev;
           }
-          console.log('Adding conversation message:', newMessage);
+          logger.chat('Adding conversation message:', newMessage);
           return [...prev, newMessage];
         });
         scrollToBottom();
@@ -678,7 +679,7 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
 
       // Send via WebSocket for real-time delivery (for both local chats and conversations)
       if (hasText) {
-        console.log('📡 Sending WebSocket message for real-time delivery:', {
+        logger.chat('📡 Sending WebSocket message for real-time delivery:', {
           chatId: selectedChat,
           content: messageText.trim(),
           type: 'text',
@@ -709,7 +710,7 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
         }
       }
     } catch (error) {
-      console.error('Error sending message:', error);
+      logger.error('Error sending message:', error);
       toast.error('Failed to send message');
     }
   };
@@ -732,7 +733,7 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
   //       await startSignalingScreenShare();
   //     }
   //   } catch (error) {
-  //     console.error('Failed to toggle screen share:', error);
+  //     logger.error('Failed to toggle screen share:', error);
   //     toast.error('Failed to toggle screen share');
   //   }
   // };
@@ -742,7 +743,7 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
   //   try {
   //     await acceptSignalingCall();
   //   } catch (error) {
-  //     console.error('Failed to accept call:', error);
+  //     logger.error('Failed to accept call:', error);
   //     toast.error('Failed to accept call');
   //   }
   // };
@@ -778,12 +779,12 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
 
   // Debug: Log when messages state changes
   useEffect(() => {
-    console.log('📝 Messages state updated:', messages.length, 'messages');
+    logger.chat('📝 Messages state updated:', messages.length, 'messages');
   }, [messages]);
 
   // Debug: Log when selectedChat changes
   useEffect(() => {
-    console.log('💬 Selected chat changed:', selectedChat);
+    logger.chat('💬 Selected chat changed:', selectedChat);
   }, [selectedChat]);
 
   // Periodically check WebSocket connection status
@@ -791,7 +792,7 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
     const checkConnectionStatus = () => {
       const currentStatus = webSocketService.isConnected() ? 'connected' : 'disconnected';
       if (currentStatus !== connectionStatus) {
-        console.log('🔄 Connection status changed:', connectionStatus, '->', currentStatus);
+        logger.chat('🔄 Connection status changed:', connectionStatus, '->', currentStatus);
         setConnectionStatus(currentStatus);
         
         // Show toast notification for connection status changes
@@ -831,7 +832,7 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
     }
   };
 
-  console.log({chats, conversations});
+  logger.chat({chats, conversations});
 
   // Combine conversations from backend with local chats
   const combinedChats = [
@@ -999,7 +1000,7 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
               <button
                 onClick={() => {
                   const currentStatus = webSocketService.isConnected() ? 'connected' : 'disconnected';
-                  console.log('🔍 Manual connection status check:', currentStatus);
+                  logger.chat('🔍 Manual connection status check:', currentStatus);
                   setConnectionStatus(currentStatus);
                   toast.success(`Connection status: ${currentStatus}`);
                 }}
@@ -1053,14 +1054,14 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
             <div
               key={chat.id}
                 onClick={() => {
-                 console.log("selected chat is ----",chat.id);
+                 logger.chat("selected chat is ----",chat.id);
                  
                   selectedChatRef.current = chat.id;
                   setSelectedChat(chat.id);
                 
                 // Check if it's a conversation from backend or local chat
                 const isConversation = conversations.some(conv => conv._id === chat.id);
-                console.log('Selected chat:', chat.id, 'Is conversation:', isConversation);
+                logger.chat('Selected chat:', chat.id, 'Is conversation:', isConversation);
                 
                 if (isConversation) {
                   // Verify the conversation exists in our list
@@ -1068,7 +1069,7 @@ export default function EnhancedMessages({ onInitiateCall }: EnhancedMessagesPro
                   if (conversation) {
                     loadConversationMessages(chat.id);
                   } else {
-                    console.error('Conversation not found in local list:', chat.id);
+                    logger.error('Conversation not found in local list:', chat.id);
                     toast.error('Conversation not found');
                     setMessages([]);
                   }

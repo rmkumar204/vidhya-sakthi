@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext, User, UserRole } from "./AuthContext.types";
+import { logger } from "../utils/logger";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
@@ -13,12 +14,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   /** ✅ Save user in state + localStorage */
    const login = (userData: User) => {
+      logger.auth('User login', { userId: userData.id, email: userData.email });
       setUser(userData);
       localStorage.setItem("user", JSON.stringify(userData)); 
   };
 
   /** ✅ Clear user + token and send back to role selection/login */
   const logout = () => {
+    logger.auth('User logout', { userId: user?.id });
     setUser(null);
     localStorage.removeItem("user");
     localStorage.removeItem("access_token");
@@ -54,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const backendData = await response.json();
       login(backendData); // assumes backend returns user object
     } catch (error) {
-      console.error("Backend token exchange error:", error);
+      logger.error("Backend token exchange error", { error: error instanceof Error ? error.message : 'Unknown error' });
     } finally {
       setIsPending(false);
     }
@@ -99,7 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login(userData);
       }
     } catch (err) {
-      console.error("Google token exchange error:", err);
+      logger.error("Google token exchange error", { error: err instanceof Error ? err.message : 'Unknown error' });
     }
   };
 

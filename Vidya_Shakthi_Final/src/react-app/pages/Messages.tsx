@@ -14,6 +14,7 @@ import { SimpleAudioCallModal } from '@/react-app/components/SimpleAudioCallModa
 import { MediaTest } from '@/react-app/components/MediaTest';
 import { Call } from '@/react-app/types';
 import { getUserProfile, getCurrentUserProfile, UserProfile } from '@/react-app/services/userProfileService';
+import { logger } from '@/react-app/utils/logger';
 
 // Enhanced utility function to render formatted text like Teams
 const renderFormattedText = (text: string) => {
@@ -404,7 +405,7 @@ export default function Messages() {
         }
 
       } catch (err: any) {
-        console.error('Screen share error:', err);
+        logger.error('Screen share error:', err);
         
         let errorMessage = 'Failed to start screen sharing.';
         if (err.name === 'NotAllowedError') {

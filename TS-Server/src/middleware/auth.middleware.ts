@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import asyncHandler from 'express-async-handler';
 import User from '../models/user.model';
 import { Request, Response, NextFunction } from 'express';
+import { logger } from '../config/logger';
 
 interface JwtPayload {
   id: string;
@@ -31,19 +32,34 @@ const protect = asyncHandler(async (req: Request, res: Response, next: NextFunct
       req.user = await User.findById(decoded.id).select('-password_hash');
 
       if (!req.user) {
+        logger.auth('Authentication failed: user not found', { userId: decoded.id });
         res.status(401);
         throw new Error('Not authorized, user not found');
       }
 
+      logger.auth('User authenticated successfully', { 
+        userId: req.user._id,
+        email: req.user.email,
+        path: req.path,
+        method: req.method
+      });
       next();
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      logger.error('Authentication failed: token verification error', {
+        error: error.message,
+        path: req.path,
+        method: req.method
+      });
       res.status(401);
       throw new Error('Not authorized, token failed');
     }
   }
 
   if (!token) {
+    logger.auth('Authentication failed: no token provided', {
+      path: req.path,
+      method: req.method
+    });
     res.status(401);
     throw new Error('Not authorized, no token');
   }

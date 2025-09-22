@@ -1,4 +1,5 @@
 import { webSocketService } from './WebSocketService';
+import { logger } from '../utils/logger';
 
 export interface WebRTCConfig {
   iceServers: RTCIceServer[];
@@ -37,7 +38,7 @@ export class WebRTCService {
   async initializeCall(userId: string, remoteUserId: string, callType: 'video' | 'audio'): Promise<MediaStream> {
     // Prevent duplicate calls
     if (this.localStream || this.peerConnection) {
-      console.log('⚠️ Call already in progress, skipping initialization');
+      logger.call('⚠️ Call already in progress, skipping initialization');
       throw new Error('Call already in progress');
     }
 
@@ -45,7 +46,7 @@ export class WebRTCService {
     this.remoteUserId = remoteUserId;
 
     try {
-      console.log(`🎤 Initializing ${callType} call from ${userId} to ${remoteUserId}`);
+      logger.call(`🎤 Initializing ${callType} call from ${userId} to ${remoteUserId}`);
       
       // First, ensure any existing streams are properly cleaned up
       await this.cleanupExistingStreams();
@@ -64,7 +65,7 @@ export class WebRTCService {
         }
       });
 
-      console.log('🎵 Local stream obtained:', {
+      logger.call('🎵 Local stream obtained:', {
         audioTracks: this.localStream.getAudioTracks().length,
         videoTracks: this.localStream.getVideoTracks().length
       });
@@ -75,7 +76,7 @@ export class WebRTCService {
       // Add local stream to peer connection
         this.localStream.getTracks().forEach(track => {
         if (this.peerConnection && this.localStream) {
-          console.log(`➕ Adding ${track.kind} track to peer connection`);
+          logger.call(`➕ Adding ${track.kind} track to peer connection`);
           this.peerConnection.addTrack(track, this.localStream);
         }
         });
@@ -84,16 +85,16 @@ export class WebRTCService {
       const offer = await this.peerConnection!.createOffer();
       await this.peerConnection!.setLocalDescription(offer);
 
-      console.log('📤 Sending call offer to', remoteUserId);
+      logger.call('📤 Sending call offer to', remoteUserId);
       webSocketService.sendCallOffer(remoteUserId, offer, callType);
 
       return this.localStream;
     } catch (error) {
-      console.error('❌ Error initializing call:', error);
+      logger.error('❌ Error initializing call:', error);
       
       // Handle specific device in use error
       if (error instanceof Error && (error.name === 'NotReadableError' || error.name === 'NotAllowedError')) {
-        console.log('🔄 Device access error during call initialization, attempting recovery...');
+        logger.call('🔄 Device access error during call initialization, attempting recovery...');
         await this.cleanupExistingStreams();
         await new Promise(resolve => setTimeout(resolve, 500));
         
@@ -109,13 +110,13 @@ export class WebRTCService {
             }
           });
           
-          console.log('✅ Device access recovered on retry for call initialization');
+          logger.call('✅ Device access recovered on retry for call initialization');
           
           // Continue with call setup
           this.createPeerConnection();
           this.localStream.getTracks().forEach(track => {
             if (this.peerConnection && this.localStream) {
-              console.log(`➕ Adding ${track.kind} track to peer connection`);
+              logger.call(`➕ Adding ${track.kind} track to peer connection`);
               this.peerConnection.addTrack(track, this.localStream);
             }
           });
@@ -123,12 +124,12 @@ export class WebRTCService {
           const offer = await this.peerConnection!.createOffer();
           await this.peerConnection!.setLocalDescription(offer);
 
-          console.log('📤 Sending call offer to', remoteUserId);
+          logger.call('📤 Sending call offer to', remoteUserId);
           webSocketService.sendCallOffer(remoteUserId, offer, callType);
 
           return this.localStream;
         } catch (retryError) {
-          console.error('❌ Device access still failed after retry:', retryError);
+          logger.error('❌ Device access still failed after retry:', retryError);
           this.endCall();
           throw new Error('Camera/microphone is currently in use by another application. Please close other applications using your camera/microphone and try again.');
         }
@@ -145,7 +146,7 @@ export class WebRTCService {
     this.remoteUserId = remoteUserId;
 
     try {
-      console.log(`📞 Answering ${callType} call from ${remoteUserId}`);
+      logger.call(`📞 Answering ${callType} call from ${remoteUserId}`);
       
       // First, ensure any existing streams are properly cleaned up
       await this.cleanupExistingStreams();
@@ -164,18 +165,18 @@ export class WebRTCService {
         }
       });
 
-      console.log('🎵 Local stream for answer obtained:', {
+      logger.call('🎵 Local stream for answer obtained:', {
         audioTracks: this.localStream.getAudioTracks().length,
         videoTracks: this.localStream.getVideoTracks().length
       });
 
       return this.localStream;
     } catch (error) {
-      console.error('❌ Error answering call:', error);
+      logger.error('❌ Error answering call:', error);
       
       // Handle specific device in use error
       if (error instanceof Error && (error.name === 'NotReadableError' || error.name === 'NotAllowedError')) {
-        console.log('🔄 Device access error, attempting recovery...');
+        logger.call('🔄 Device access error, attempting recovery...');
         await this.cleanupExistingStreams();
         await new Promise(resolve => setTimeout(resolve, 500));
         
@@ -191,10 +192,10 @@ export class WebRTCService {
             }
           });
           
-          console.log('✅ Device access recovered on retry');
+          logger.call('✅ Device access recovered on retry');
           return this.localStream;
         } catch (retryError) {
-          console.error('❌ Device access still failed after retry:', retryError);
+          logger.error('❌ Device access still failed after retry:', retryError);
           this.endCall();
           throw new Error('Camera/microphone is currently in use by another application. Please close other applications using your camera/microphone and try again.');
         }
@@ -207,13 +208,13 @@ export class WebRTCService {
   }
 
   private async cleanupExistingStreams(): Promise<void> {
-    console.log('🧹 Cleaning up existing streams...');
+    logger.call('🧹 Cleaning up existing streams...');
     
     // Stop any existing local stream
     if (this.localStream) {
       this.localStream.getTracks().forEach(track => {
         track.stop();
-        console.log(`✋ Stopped existing ${track.kind} track`);
+        logger.call(`✋ Stopped existing ${track.kind} track`);
       });
       this.localStream = null;
     }
@@ -222,7 +223,7 @@ export class WebRTCService {
     if (this.remoteStream) {
       this.remoteStream.getTracks().forEach(track => {
         track.stop();
-        console.log(`✋ Stopped existing remote ${track.kind} track`);
+        logger.call(`✋ Stopped existing remote ${track.kind} track`);
       });
       this.remoteStream = null;
     }
@@ -233,12 +234,12 @@ export class WebRTCService {
       this.peerConnection = null;
     }
     
-    console.log('✅ Existing streams cleaned up');
+    logger.call('✅ Existing streams cleaned up');
   }
 
   async checkDeviceAvailability(callType: 'video' | 'audio'): Promise<{ available: boolean; error?: string }> {
     try {
-      console.log(`🔍 Checking device availability for ${callType} call...`);
+      logger.call(`🔍 Checking device availability for ${callType} call...`);
       
       // Get a temporary stream to test device availability
       const testStream = await navigator.mediaDevices.getUserMedia({
@@ -249,10 +250,10 @@ export class WebRTCService {
       // Immediately stop the test stream
       testStream.getTracks().forEach(track => track.stop());
       
-      console.log('✅ Devices are available');
+      logger.call('✅ Devices are available');
       return { available: true };
     } catch (error) {
-      console.error('❌ Device availability check failed:', error);
+      logger.error('❌ Device availability check failed:', error);
       
       let errorMessage = 'Unknown error';
       if (error instanceof Error) {
@@ -272,25 +273,25 @@ export class WebRTCService {
   }
 
   private createPeerConnection() {
-    console.log('🔗 Creating peer connection with config:', this.config);
+    logger.call('🔗 Creating peer connection with config:', this.config);
     this.peerConnection = new RTCPeerConnection(this.config);
 
     // Handle ICE candidates
     this.peerConnection.onicecandidate = (event) => {
       if (event.candidate && this.remoteUserId) {
-        console.log('🧨 Sending ICE candidate to', this.remoteUserId);
+        logger.call('🧨 Sending ICE candidate to', this.remoteUserId);
         webSocketService.sendIceCandidate(this.remoteUserId, event.candidate);
       } else if (!event.candidate) {
-        console.log('✅ ICE gathering complete');
+        logger.call('✅ ICE gathering complete');
       }
     };
 
     // Handle remote stream
     this.peerConnection.ontrack = (event) => {
-      console.log('📡 Received remote track:', event.track.kind);
+      logger.call('📡 Received remote track:', event.track.kind);
       this.remoteStream = event.streams[0];
       
-      console.log('🎵 Remote stream details:', {
+      logger.call('🎵 Remote stream details:', {
         audioTracks: this.remoteStream.getAudioTracks().length,
         videoTracks: this.remoteStream.getVideoTracks().length
       });
@@ -303,20 +304,20 @@ export class WebRTCService {
     // Handle connection state changes
     this.peerConnection.onconnectionstatechange = () => {
       if (this.peerConnection) {
-        console.log('🔗 Connection state:', this.peerConnection.connectionState);
+        logger.call('🔗 Connection state:', this.peerConnection.connectionState);
         if (this.peerConnection.connectionState === 'failed') {
-          console.log('❌ Connection failed - ending call');
+          logger.call('❌ Connection failed - ending call');
           this.endCall();
         } else if (this.peerConnection.connectionState === 'disconnected') {
-          console.log('⚠️ Connection disconnected - giving some time to reconnect');
+          logger.call('⚠️ Connection disconnected - giving some time to reconnect');
           setTimeout(() => {
             if (this.peerConnection && this.peerConnection.connectionState === 'disconnected') {
-              console.log('⏰ Still disconnected after timeout - ending call');
+              logger.call('⏰ Still disconnected after timeout - ending call');
               this.endCall();
             }
           }, 5000); // Give 5 seconds for reconnection
         } else if (this.peerConnection.connectionState === 'connected') {
-          console.log('✅ WebRTC connection established successfully');
+          logger.call('✅ WebRTC connection established successfully');
         }
       }
     };
@@ -324,7 +325,7 @@ export class WebRTCService {
     // Handle ICE connection state
     this.peerConnection.oniceconnectionstatechange = () => {
       if (this.peerConnection) {
-        console.log('🧨 ICE connection state:', this.peerConnection.iceConnectionState);
+        logger.call('🧨 ICE connection state:', this.peerConnection.iceConnectionState);
       }
     };
   }
@@ -336,10 +337,10 @@ export class WebRTCService {
       const callType = data.callType || data.payload?.callType;
       const fromUserId = data.fromUserId || data.payload?.fromUserId;
       
-      console.log('📞 Handling call offer for', callType, 'call from', fromUserId);
+      logger.call('📞 Handling call offer for', callType, 'call from', fromUserId);
       
       if (!offer || !callType) {
-        console.error('❌ Invalid call offer data:', data);
+        logger.error('❌ Invalid call offer data:', data);
         return;
       }
       
@@ -356,10 +357,10 @@ export class WebRTCService {
 
       // Add local stream if we have it
       if (this.localStream) {
-        console.log('➕ Adding local stream tracks to peer connection');
+        logger.call('➕ Adding local stream tracks to peer connection');
         this.localStream.getTracks().forEach(track => {
           if (this.peerConnection && this.localStream) {
-            console.log(`➕ Adding ${track.kind} track`);
+            logger.call(`➕ Adding ${track.kind} track`);
             this.peerConnection.addTrack(track, this.localStream);
           }
         });
@@ -370,11 +371,11 @@ export class WebRTCService {
       await this.peerConnection!.setLocalDescription(answer);
       
       if (this.remoteUserId) {
-        console.log('📤 Sending call answer to', this.remoteUserId);
+        logger.call('📤 Sending call answer to', this.remoteUserId);
         webSocketService.sendCallAnswer(this.remoteUserId, answer);
       }
     } catch (error) {
-      console.error('❌ Error handling call offer:', error);
+      logger.error('❌ Error handling call offer:', error);
       // Clean up on error
       this.endCall();
     }
@@ -386,7 +387,7 @@ export class WebRTCService {
       const answer = data.answer || data.payload?.answer;
       
       if (!answer) {
-        console.error('❌ Invalid call answer data:', data);
+        logger.error('❌ Invalid call answer data:', data);
         return;
       }
       
@@ -394,7 +395,7 @@ export class WebRTCService {
         await this.peerConnection.setRemoteDescription(answer);
       }
     } catch (error) {
-      console.error('Error handling call answer:', error);
+      logger.error('Error handling call answer:', error);
     }
   }
 
@@ -404,7 +405,7 @@ export class WebRTCService {
       const candidate = data.candidate || data.payload?.candidate;
       
       if (!candidate) {
-        console.error('❌ Invalid ICE candidate data:', data);
+        logger.error('❌ Invalid ICE candidate data:', data);
         return;
       }
       
@@ -412,50 +413,50 @@ export class WebRTCService {
         await this.peerConnection.addIceCandidate(candidate);
       }
     } catch (error) {
-      console.error('Error handling ICE candidate:', error);
+      logger.error('Error handling ICE candidate:', error);
     }
   }
 
   private handleCallEnd(data: any) {
-    console.log('🔴 ❗ WebRTCService: Received call_end signal from WebSocket:', data);
-    console.log('🔄 WebRTCService: Processing call end - will trigger cleanup only');
+    logger.call('🔴 ❗ WebRTCService: Received call_end signal from WebSocket:', data);
+    logger.call('🔄 WebRTCService: Processing call end - will trigger cleanup only');
     
     // Validate that this is actually a call_end message
     if (!data && typeof data !== 'object') {
-      console.warn('⚠️ Invalid call_end data received:', data);
+      logger.warn('⚠️ Invalid call_end data received:', data);
     }
     
     // Don't send notification back - this is from remote user
-    console.log('🧠 WebRTCService: Call end received from remote, performing silent cleanup');
+    logger.call('🧠 WebRTCService: Call end received from remote, performing silent cleanup');
     this.cleanup();
     
-    console.log('✅ WebRTCService: Call end processing complete');
+    logger.call('✅ WebRTCService: Call end processing complete');
   }
 
   private handleCallAccept(data: any) {
-    console.log('✅ ❗ WebRTCService: Received call_accept signal from WebSocket:', data);
-    console.log('🔄 WebRTCService: Call was accepted by remote user');
+    logger.call('✅ ❗ WebRTCService: Received call_accept signal from WebSocket:', data);
+    logger.call('🔄 WebRTCService: Call was accepted by remote user');
     
     // This is just for logging/state tracking - the actual WebRTC connection
     // is established through the offer/answer exchange
     if (this.onCallAcceptCallback) {
-      console.log('📞 Calling accept callback');
+      logger.call('📞 Calling accept callback');
       this.onCallAcceptCallback(data);
     }
   }
 
   endCall() {
     if (this.isEnding) {
-      console.log('⚠️ Call end already in progress, ignoring duplicate call');
+      logger.call('⚠️ Call end already in progress, ignoring duplicate call');
       return;
     }
     
     this.isEnding = true;
-    console.log('🛑 WebRTCService: Ending call - cleaning up resources');
+    logger.call('🛑 WebRTCService: Ending call - cleaning up resources');
     
     // Prevent multiple simultaneous end calls
     if (!this.localStream && !this.peerConnection && !this.remoteUserId) {
-      console.log('⚠️ Call already ended, skipping cleanup');
+      logger.call('⚠️ Call already ended, skipping cleanup');
       this.isEnding = false;
       return;
     }
@@ -465,20 +466,20 @@ export class WebRTCService {
     
     // Stop local stream
     if (this.localStream) {
-      console.log('🎵 Stopping local stream tracks:', {
+      logger.call('🎵 Stopping local stream tracks:', {
         audioTracks: this.localStream.getAudioTracks().length,
         videoTracks: this.localStream.getVideoTracks().length
       });
       this.localStream.getTracks().forEach(track => {
         track.stop();
-        console.log(`✋ Stopped ${track.kind} track`);
+        logger.call(`✋ Stopped ${track.kind} track`);
       });
       this.localStream = null;
     }
 
     // Close peer connection
     if (this.peerConnection) {
-      console.log('🔗 Closing peer connection');
+      logger.call('🔗 Closing peer connection');
       this.peerConnection.close();
       this.peerConnection = null;
     }
@@ -488,18 +489,18 @@ export class WebRTCService {
     this.remoteUserId = null;
     this.currentUserId = null;
 
-    console.log('✅ WebRTCService: Call cleanup complete');
+    logger.call('✅ WebRTCService: Call cleanup complete');
 
     // Notify remote user about call end ONLY if we haven't already sent it
     // AND only if this was initiated by user action (not WebSocket message)
     if (remoteUserToNotify && webSocketService.isConnected()) {
-      console.log('📤 Notifying remote user about call end:', remoteUserToNotify);
+      logger.call('📤 Notifying remote user about call end:', remoteUserToNotify);
       webSocketService.sendCallEnd(remoteUserToNotify);
     }
 
     // Call end callback ONLY if not in cleanup mode
     if (this.onCallEndCallback) {
-      console.log('📞 Calling end callback');
+      logger.call('📞 Calling end callback');
       // Clear the callback to prevent multiple calls
       const callback = this.onCallEndCallback;
       this.onCallEndCallback = null;
@@ -516,32 +517,32 @@ export class WebRTCService {
   }
 
   toggleAudio(enabled: boolean) {
-    console.log(`🎤 Toggling audio: ${enabled ? 'ON' : 'OFF'}`);
+    logger.call(`🎤 Toggling audio: ${enabled ? 'ON' : 'OFF'}`);
     if (this.localStream) {
       this.localStream.getAudioTracks().forEach(track => {
         track.enabled = enabled;
-        console.log(`Audio track enabled: ${track.enabled}`);
+        logger.call(`Audio track enabled: ${track.enabled}`);
       });
       
       // Notify the remote user about mute status
       if (this.remoteUserId && webSocketService.isConnected()) {
-        console.log(`📢 Notifying ${this.remoteUserId} about mute status: ${!enabled}`);
+        logger.call(`📢 Notifying ${this.remoteUserId} about mute status: ${!enabled}`);
         webSocketService.sendMuteStatus(this.remoteUserId, !enabled, this.currentUserId || '');
       }
     }
   }
 
   toggleVideo(enabled: boolean) {
-    console.log(`📹 Toggling video: ${enabled ? 'ON' : 'OFF'}`);
+    logger.call(`📹 Toggling video: ${enabled ? 'ON' : 'OFF'}`);
     if (this.localStream) {
       this.localStream.getVideoTracks().forEach(track => {
         track.enabled = enabled;
-        console.log(`Video track enabled: ${track.enabled}`);
+        logger.call(`Video track enabled: ${track.enabled}`);
       });
       
       // Notify the remote user about video status
       if (this.remoteUserId && webSocketService.isConnected()) {
-        console.log(`📢 Notifying ${this.remoteUserId} about video status: ${enabled}`);
+        logger.call(`📢 Notifying ${this.remoteUserId} about video status: ${enabled}`);
         webSocketService.sendVideoStatus(this.remoteUserId, !enabled, this.currentUserId || '');
       }
     }
@@ -555,14 +556,14 @@ export class WebRTCService {
     // Clear any existing callback to prevent multiple registrations
     this.onCallEndCallback = null;
     this.onCallEndCallback = callback;
-    console.log('📁 WebRTC: Call end callback registered');
+    logger.call('📁 WebRTC: Call end callback registered');
   }
 
   onCallAccept(callback: (data: any) => void) {
     // Clear any existing callback to prevent multiple registrations
     this.onCallAcceptCallback = null;
     this.onCallAcceptCallback = callback;
-    console.log('📁 WebRTC: Call accept callback registered');
+    logger.call('📁 WebRTC: Call accept callback registered');
   }
 
   getLocalStream(): MediaStream | null {
@@ -575,29 +576,29 @@ export class WebRTCService {
 
   cleanup() {
     if (this.isEnding) {
-      console.log('⚠️ Cleanup already in progress, ignoring duplicate call');
+      logger.call('⚠️ Cleanup already in progress, ignoring duplicate call');
       return;
     }
     
     this.isEnding = true;
-    console.log('🧹 WebRTCService: Silent cleanup called - no callbacks triggered');
+    logger.call('🧹 WebRTCService: Silent cleanup called - no callbacks triggered');
     
     // Stop local stream
     if (this.localStream) {
-      console.log('🎵 Stopping local stream tracks:', {
+      logger.call('🎵 Stopping local stream tracks:', {
         audioTracks: this.localStream.getAudioTracks().length,
         videoTracks: this.localStream.getVideoTracks().length
       });
       this.localStream.getTracks().forEach(track => {
         track.stop();
-        console.log(`✋ Stopped ${track.kind} track`);
+        logger.call(`✋ Stopped ${track.kind} track`);
       });
       this.localStream = null;
     }
 
     // Close peer connection
     if (this.peerConnection) {
-      console.log('🔗 Closing peer connection');
+      logger.call('🔗 Closing peer connection');
       this.peerConnection.close();
       this.peerConnection = null;
     }
@@ -607,7 +608,7 @@ export class WebRTCService {
     this.remoteUserId = null;
     this.currentUserId = null;
 
-    console.log('✅ WebRTCService: Silent cleanup complete');
+    logger.call('✅ WebRTCService: Silent cleanup complete');
     
     // Reset the ending flag after a short delay
     setTimeout(() => {

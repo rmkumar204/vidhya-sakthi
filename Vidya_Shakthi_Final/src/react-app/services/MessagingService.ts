@@ -1,6 +1,7 @@
 // Comprehensive Messaging Service with Local Storage and WebSocket
 import { webSocketService } from './WebSocketService';
 import { localStorageService, StoredMessage, StoredChat, StoredConnection } from './LocalStorageService';
+import { logger } from '../utils/logger';
 
 export interface Message {
   id: string;
@@ -138,7 +139,7 @@ class MessagingService {
         try {
           handler(data);
         } catch (error) {
-          console.error(`Error in event handler for ${event}:`, error);
+          logger.error(`Error in event handler for ${event}:`, error);
         }
       });
     }

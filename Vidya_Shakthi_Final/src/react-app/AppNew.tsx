@@ -12,6 +12,7 @@ import OutgoingCallModal from './components/OutgoingCallModal';
 import AudioCallView from './components/AudioCallView';
 import VideoCallView from './components/VideoCallView';
 import { AppContext } from './AppContext';
+import { logger } from './utils/logger';
 
 const App: React.FC = () => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(() => sessionStorage.getItem('currentUserId'));
@@ -33,10 +34,10 @@ const App: React.FC = () => {
 
   // Update activeChat when chats change (to reflect new messages)
   useEffect(() => {
-    console.log('🔄 App.tsx: Chats or users changed. ActiveChat:', activeChat?.id, 'Chats count:', chats.length);
+    logger.info('🔄 App.tsx: Chats or users changed. ActiveChat:', activeChat?.id, 'Chats count:', chats.length);
     if (activeChat) {
       const updatedChat = chats.find(c => c.id === activeChat.id);
-      console.log('🔄 App.tsx: Found updated chat:', {
+      logger.info('🔄 App.tsx: Found updated chat:', {
         found: !!updatedChat,
         oldMessageCount: activeChat.messages.length,
         newMessageCount: updatedChat?.messages.length || 0
@@ -47,7 +48,7 @@ const App: React.FC = () => {
           ...updatedChat,
           users: users.filter(u => updatedChat.userIds.includes(u.id))
         };
-        console.log('🔄 App.tsx: Updating active chat from chats change:', {
+        logger.info('🔄 App.tsx: Updating active chat from chats change:', {
           chatId: enrichedChat.id,
           oldMessageCount: activeChat.messages.length,
           newMessageCount: enrichedChat.messages.length,
@@ -55,7 +56,7 @@ const App: React.FC = () => {
         });
         setActiveChat(enrichedChat);
       } else {
-        console.log('🔄 App.tsx: No message count change, not updating activeChat');
+        logger.info('🔄 App.tsx: No message count change, not updating activeChat');
       }
     }
   }, [chats, users]); // Removed activeChat?.id to allow proper updates
@@ -63,7 +64,7 @@ const App: React.FC = () => {
   // Listen for chat refresh events from call system
   useEffect(() => {
     const handleChatRefresh = () => {
-      console.log('🔄 App.tsx: Chat refresh event received');
+      logger.info('🔄 App.tsx: Chat refresh event received');
       if (activeChat) {
         const refreshedChat = chats.find(c => c.id === activeChat.id);
         if (refreshedChat) {
@@ -71,7 +72,7 @@ const App: React.FC = () => {
             ...refreshedChat,
             users: users.filter(u => refreshedChat.userIds.includes(u.id))
           };
-          console.log('🔄 App.tsx: Refreshing activeChat after call:', {
+          logger.info('🔄 App.tsx: Refreshing activeChat after call:', {
             chatId: enrichedChat.id,
             messageCount: enrichedChat.messages.length
           });
@@ -122,7 +123,7 @@ const App: React.FC = () => {
   const handleLogout = () => {
     // Clear any active calls first
     if (call) {
-      console.log('🚪 Logout: Cleaning up active call before logout');
+      logger.info('🚪 Logout: Cleaning up active call before logout');
       webRTCService.endCall();
       endCall();
     }
@@ -135,7 +136,7 @@ const App: React.FC = () => {
     setCurrentUserId(null);
     setActiveChat(null);
     
-    console.log('✅ Logout completed with cleanup');
+    logger.info('✅ Logout completed with cleanup');
   };
 
   const connectedUsers = useMemo(() => {
@@ -146,14 +147,14 @@ const App: React.FC = () => {
   }, [chats, users, currentUserId]);
 
   const handleSelectChat = (userId: string) => {
-    console.log('📋 App.tsx: Selecting chat with user:', userId);
+    logger.info('📋 App.tsx: Selecting chat with user:', userId);
     const chat = chats.find(c => c.userIds.includes(userId));
     if (chat) {
       const enrichedChat = {
         ...chat,
         users: users.filter(u => chat.userIds.includes(u.id))
       };
-      console.log('📋 App.tsx: Setting active chat:', {
+      logger.info('📋 App.tsx: Setting active chat:', {
         chatId: enrichedChat.id,
         messageCount: enrichedChat.messages.length,
         users: enrichedChat.users.map(u => u.name)
@@ -165,7 +166,7 @@ const App: React.FC = () => {
   
   const handleSendMessage = async (chatId: string, content: string, type: 'text' | 'voice' = 'text') => {
     if (!currentUser) return;
-    console.log('📤 App.tsx: Sending message:', { chatId, content, type });
+    logger.info('📤 App.tsx: Sending message:', { chatId, content, type });
     await apiSendMessage(chatId, currentUser.id, content, type);
     // Note: Message updates are now handled by ChatWindow via WebSocket
   };
@@ -219,11 +220,11 @@ const App: React.FC = () => {
              user={currentUser} 
              otherUser={otherUserInCall} 
              onEndCall={() => {
-               console.log('📞 App: Audio call ended from component');
+               logger.info('📞 App: Audio call ended from component');
                endCall();
                // Force refresh activeChat after call ends
                if (activeChat) {
-                 console.log('🔄 App: Refreshing activeChat after call end');
+                 logger.info('🔄 App: Refreshing activeChat after call end');
                  const refreshedChat = chats.find(c => c.id === activeChat.id);
                  if (refreshedChat) {
                    const enrichedChat = {
@@ -242,11 +243,11 @@ const App: React.FC = () => {
              user={currentUser} 
              otherUser={otherUserInCall} 
              onEndCall={() => {
-               console.log('📞 App: Video call ended from component');
+               logger.info('📞 App: Video call ended from component');
                endCall();
                // Force refresh activeChat after call ends
                if (activeChat) {
-                 console.log('🔄 App: Refreshing activeChat after call end');
+                 logger.info('🔄 App: Refreshing activeChat after call end');
                  const refreshedChat = chats.find(c => c.id === activeChat.id);
                  if (refreshedChat) {
                    const enrichedChat = {

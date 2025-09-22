@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import CallHistory, { CallHistoryEntry } from '../components/CallHistory';
 import { getUserData } from '../services/UserService';
+import { logger } from '../utils/logger';
 
 const CallHistoryPage: React.FC = () => {
   const { user } = useAuth();
@@ -70,7 +71,7 @@ const CallHistoryPage: React.FC = () => {
           setCallHistory(mockHistory);
         }
       } catch (error) {
-        console.error('Failed to load call history:', error);
+        logger.error('Failed to load call history:', error);
       } finally {
         setLoading(false);
       }
@@ -102,7 +103,7 @@ const CallHistoryPage: React.FC = () => {
 
   const handleCallUser = (userId: string, callType: 'audio' | 'video') => {
     // This would initiate a new call to the user
-    console.log(`Initiating ${callType} call to user ${userId}`);
+    logger.info(`Initiating ${callType} call to user ${userId}`);
     // You can integrate this with your existing call initiation logic
   };
 

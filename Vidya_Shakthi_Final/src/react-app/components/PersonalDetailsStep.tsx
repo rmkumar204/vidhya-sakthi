@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { PersonalDetailsType } from '@/shared/types';
+import { logger } from '../utils/logger';
 
 interface PersonalDetailsStepProps {
   data: PersonalDetailsType;
@@ -54,13 +55,13 @@ export default function PersonalDetailsStep({
       .then((resData: IState[]) => 
         setStates(resData)
       )
-      .catch((err) => console.error('Error fetching states:', err));
+      .catch((err) => logger.error('Error fetching states:', err));
   }, []);
 
   useEffect(()=>{
     // Log states for debugging
     if (process.env.NODE_ENV === 'development') {
-      console.log('states', states);
+      logger.info('states', states);
     }
   },[states])
   // Fetch districts when state changes
@@ -69,7 +70,7 @@ export default function PersonalDetailsStep({
       fetch(`${API_BASE_URL}/locations/districts?stateId=${data.state}`)
         .then((res) => res.json())
         .then((resData) => setDistricts(resData))
-        .catch((err) => console.error('Error fetching districts:', err));
+        .catch((err) => logger.error('Error fetching districts:', err));
     } else {
       setDistricts([]);
       setBlocks([]);
@@ -83,7 +84,7 @@ export default function PersonalDetailsStep({
       fetch(`${API_BASE_URL}/locations/blocks?districtId=${data.district}`)
         .then((res) => res.json())
         .then((resData) => setBlocks(resData))
-        .catch((err) => console.error('Error fetching blocks:', err));
+        .catch((err) => logger.error('Error fetching blocks:', err));
     } else {
       setBlocks([]);
       setPincodes([]);
@@ -96,7 +97,7 @@ export default function PersonalDetailsStep({
       fetch(`${API_BASE_URL}/locations/pincodes?talukId=${data.block}`)
         .then((res) => res.json())
         .then((resData) => setPincodes(resData))
-        .catch((err) => console.error('Error fetching pincodes:', err));
+        .catch((err) => logger.error('Error fetching pincodes:', err));
     } else {
       setPincodes([]);
     }

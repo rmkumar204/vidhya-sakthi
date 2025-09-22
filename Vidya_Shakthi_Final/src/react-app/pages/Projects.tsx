@@ -4,6 +4,7 @@ import ProjectCreateModal from '@/react-app/components/ProjectCreateModal';
 import { useProjects } from '@/react-app/hooks/useProjects';
 import { useAuth } from '@/react-app/hooks/useAuth';
 import toast from 'react-hot-toast';
+import { logger } from '@/react-app/utils/logger';
 
 export default function Projects() {
   const { user } = useAuth();
@@ -162,7 +163,7 @@ export default function Projects() {
               await addProject(payload, token);
               toast.success('Project created successfully!');
             } catch (error: any) {
-              console.error('Failed to create project:', error);
+              logger.error('Failed to create project:', error);
               toast.error(error.message || 'Failed to create project');
             }
           }}

@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger';
+
 // Local Storage Service for Message Persistence
 export interface StoredMessage {
   id: string;
@@ -64,7 +66,7 @@ class LocalStorageService {
       
       localStorage.setItem(this.STORAGE_KEYS.MESSAGES, JSON.stringify(messages));
     } catch (error) {
-      console.error('Error saving message to localStorage:', error);
+      logger.error('Error saving message to localStorage:', error);
     }
   }
 
@@ -73,7 +75,7 @@ class LocalStorageService {
       const messages = JSON.parse(localStorage.getItem(this.STORAGE_KEYS.MESSAGES) || '[]');
       return chatId ? messages.filter((m: StoredMessage) => m.chatId === chatId) : messages;
     } catch (error) {
-      console.error('Error loading messages from localStorage:', error);
+      logger.error('Error loading messages from localStorage:', error);
       return [];
     }
   }
@@ -84,7 +86,7 @@ class LocalStorageService {
       const filteredMessages = messages.filter(m => m.id !== messageId);
       localStorage.setItem(this.STORAGE_KEYS.MESSAGES, JSON.stringify(filteredMessages));
     } catch (error) {
-      console.error('Error deleting message from localStorage:', error);
+      logger.error('Error deleting message from localStorage:', error);
     }
   }
 
@@ -98,7 +100,7 @@ class LocalStorageService {
         localStorage.removeItem(this.STORAGE_KEYS.MESSAGES);
       }
     } catch (error) {
-      console.error('Error clearing messages from localStorage:', error);
+      logger.error('Error clearing messages from localStorage:', error);
     }
   }
 
@@ -123,7 +125,7 @@ class LocalStorageService {
       
       localStorage.setItem(this.STORAGE_KEYS.CHATS, JSON.stringify(chats));
     } catch (error) {
-      console.error('Error saving chat to localStorage:', error);
+      logger.error('Error saving chat to localStorage:', error);
     }
   }
 
@@ -131,7 +133,7 @@ class LocalStorageService {
     try {
       return JSON.parse(localStorage.getItem(this.STORAGE_KEYS.CHATS) || '[]');
     } catch (error) {
-      console.error('Error loading chats from localStorage:', error);
+      logger.error('Error loading chats from localStorage:', error);
       return [];
     }
   }
@@ -141,7 +143,7 @@ class LocalStorageService {
       const chats = this.getChats();
       return chats.find(c => c.id === chatId) || null;
     } catch (error) {
-      console.error('Error loading chat from localStorage:', error);
+      logger.error('Error loading chat from localStorage:', error);
       return null;
     }
   }
@@ -158,7 +160,7 @@ class LocalStorageService {
         localStorage.setItem(this.STORAGE_KEYS.CHATS, JSON.stringify(chats));
       }
     } catch (error) {
-      console.error('Error updating chat last message:', error);
+      logger.error('Error updating chat last message:', error);
     }
   }
 
@@ -172,7 +174,7 @@ class LocalStorageService {
         localStorage.setItem(this.STORAGE_KEYS.CHATS, JSON.stringify(chats));
       }
     } catch (error) {
-      console.error('Error incrementing unread count:', error);
+      logger.error('Error incrementing unread count:', error);
     }
   }
 
@@ -186,7 +188,7 @@ class LocalStorageService {
         localStorage.setItem(this.STORAGE_KEYS.CHATS, JSON.stringify(chats));
       }
     } catch (error) {
-      console.error('Error clearing unread count:', error);
+      logger.error('Error clearing unread count:', error);
     }
   }
 
@@ -204,7 +206,7 @@ class LocalStorageService {
       
       localStorage.setItem(this.STORAGE_KEYS.CONNECTIONS, JSON.stringify(connections));
     } catch (error) {
-      console.error('Error saving connection to localStorage:', error);
+      logger.error('Error saving connection to localStorage:', error);
     }
   }
 
@@ -212,7 +214,7 @@ class LocalStorageService {
     try {
       return JSON.parse(localStorage.getItem(this.STORAGE_KEYS.CONNECTIONS) || '[]');
     } catch (error) {
-      console.error('Error loading connections from localStorage:', error);
+      logger.error('Error loading connections from localStorage:', error);
       return [];
     }
   }
@@ -222,7 +224,7 @@ class LocalStorageService {
       const connections = this.getConnections();
       return connections.filter(c => c.mentorId === userId || c.menteeId === userId);
     } catch (error) {
-      console.error('Error loading user connections from localStorage:', error);
+      logger.error('Error loading user connections from localStorage:', error);
       return [];
     }
   }
@@ -238,7 +240,7 @@ class LocalStorageService {
         localStorage.setItem(this.STORAGE_KEYS.CONNECTIONS, JSON.stringify(connections));
       }
     } catch (error) {
-      console.error('Error updating connection status:', error);
+      logger.error('Error updating connection status:', error);
     }
   }
 
@@ -247,7 +249,7 @@ class LocalStorageService {
     try {
       localStorage.setItem(this.STORAGE_KEYS.USER_PREFERENCES, JSON.stringify(preferences));
     } catch (error) {
-      console.error('Error saving user preferences:', error);
+      logger.error('Error saving user preferences:', error);
     }
   }
 
@@ -255,7 +257,7 @@ class LocalStorageService {
     try {
       return JSON.parse(localStorage.getItem(this.STORAGE_KEYS.USER_PREFERENCES) || '{}');
     } catch (error) {
-      console.error('Error loading user preferences:', error);
+      logger.error('Error loading user preferences:', error);
       return {};
     }
   }
@@ -267,7 +269,7 @@ class LocalStorageService {
         localStorage.removeItem(key);
       });
     } catch (error) {
-      console.error('Error clearing all data:', error);
+      logger.error('Error clearing all data:', error);
     }
   }
 
@@ -286,7 +288,7 @@ class LocalStorageService {
       
       return { used, available };
     } catch (error) {
-      console.error('Error calculating storage size:', error);
+      logger.error('Error calculating storage size:', error);
       return { used: 0, available: 0 };
     }
   }
@@ -303,7 +305,7 @@ class LocalStorageService {
       };
       return JSON.stringify(data, null, 2);
     } catch (error) {
-      console.error('Error exporting data:', error);
+      logger.error('Error exporting data:', error);
       return '';
     }
   }
@@ -327,7 +329,7 @@ class LocalStorageService {
       
       return true;
     } catch (error) {
-      console.error('Error importing data:', error);
+      logger.error('Error importing data:', error);
       return false;
     }
   }

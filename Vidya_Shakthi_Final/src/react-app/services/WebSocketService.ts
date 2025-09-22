@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger';
+
 interface WebSocketMessage {
   type: 'message' | 'user_joined' | 'user_left' | 'typing' | 'call_offer' | 'call_answer' | 'call_ice_candidate' | 'call_end' | 'call_mute_status' | 'call_video_status' | 'call_ringing' | 'call_accept' | 'scheduled_message';
   payload: any;
@@ -31,18 +33,21 @@ export class WebSocketService {
         this.serverUrl = `${protocol}//${hostname}:8080`;
       }
       
-      console.log('🔌 WebSocket URL determined for', navigator.userAgent.includes('Chrome') ? 'Chrome' : navigator.userAgent.includes('Edge') ? 'Edge' : 'Browser', ':', this.serverUrl);
+      logger.websocket('WebSocket URL determined', { 
+        browser: navigator.userAgent.includes('Chrome') ? 'Chrome' : navigator.userAgent.includes('Edge') ? 'Edge' : 'Browser',
+        url: this.serverUrl
+      });
     }
   }
 
   connect(userId: string): Promise<void> {
     if (this.isConnecting && this.connectionPromise) {
-      console.log('🔄 Connection already in progress, returning existing promise');
+      logger.websocket('Connection already in progress, returning existing promise', { userId });
       return this.connectionPromise;
     }
     
     if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentUserId === userId) {
-      console.log('✅ Already connected with same user ID');
+      logger.websocket('Already connected with same user ID', { userId });
       return Promise.resolve();
     }
 
@@ -60,7 +65,7 @@ export class WebSocketService {
         }
         
         const wsUrl = `${this.serverUrl}?userId=${encodeURIComponent(userId)}&browser=${encodeURIComponent(navigator.userAgent)}`;
-        console.log('🚀 Connecting to WebSocket:', wsUrl);
+        logger.websocket('🚀 Connecting to WebSocket:', wsUrl);
         
         // Browser-specific WebSocket options
         
@@ -74,7 +79,7 @@ export class WebSocketService {
         // Set timeouts for connection
         connectionTimeout = setTimeout(() => {
           if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
-            console.error('⏰ WebSocket connection timeout');
+            logger.error('⏰ WebSocket connection timeout');
             this.ws.close();
             this.isConnecting = false;
             reject(new Error('Connection timeout'));
@@ -83,7 +88,7 @@ export class WebSocketService {
 
         this.ws.onopen = () => {
           if (connectionTimeout) clearTimeout(connectionTimeout);
-          console.log('✅ WebSocket connected to:', this.serverUrl);
+          logger.websocket('✅ WebSocket connected to:', this.serverUrl);
           this.isConnecting = false;
           this.reconnectAttempts = 0;
           resolve();
@@ -91,17 +96,17 @@ export class WebSocketService {
 
         this.ws.onmessage = (event) => {
           try {
-            console.log("========================================= ws message");
+            logger.websocket("========================================= ws message");
             const message: WebSocketMessage = JSON.parse(event.data);
             this.handleMessage(message);
           } catch (error) {
-            console.error('❌ Error parsing WebSocket message:', error, 'Raw data:', event.data);
+            logger.error('❌ Error parsing WebSocket message:', error, 'Raw data:', event.data);
           }
         };
 
         this.ws.onclose = (event) => {
           if (connectionTimeout) clearTimeout(connectionTimeout);
-          console.log('🔴 WebSocket disconnected. Code:', event.code, 'Reason:', event.reason);
+          logger.websocket('🔴 WebSocket disconnected. Code:', event.code, 'Reason:', event.reason);
           this.isConnecting = false;
           this.ws = null;
           this.connectionPromise = null;
@@ -114,7 +119,7 @@ export class WebSocketService {
 
         this.ws.onerror = (error) => {
           if (connectionTimeout) clearTimeout(connectionTimeout);
-          console.error('❌ WebSocket error:', error);
+          logger.error('❌ WebSocket error:', error);
           this.isConnecting = false;
           this.connectionPromise = null;
           reject(error);
@@ -133,12 +138,12 @@ export class WebSocketService {
   private handleReconnect() {
     if (this.reconnectAttempts < this.maxReconnectAttempts && this.currentUserId) {
       this.reconnectAttempts++;
-      console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+      logger.websocket(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
       
       setTimeout(() => {
         if (this.currentUserId) {
           this.connect(this.currentUserId).catch(error => {
-            console.error('Reconnection failed:', error);
+            logger.error('Reconnection failed:', error);
           });
         }
       }, this.reconnectInterval);
@@ -146,12 +151,12 @@ export class WebSocketService {
   }
 
   private handleMessage(message: WebSocketMessage) {
-    console.log("========================================= handleMessage");
-    console.log('📨 WebSocket received message:', message);
+    logger.websocket("========================================= handleMessage");
+    logger.websocket('📨 WebSocket received message:', message);
     
     // Enhanced debugging for call_end messages
     if (message.type === 'call_end') {
-      console.log('🔴 ❗ CALL_END MESSAGE RECEIVED:', {
+      logger.websocket('🔴 ❗ CALL_END MESSAGE RECEIVED:', {
         type: message.type,
         payload: message.payload,
         from: message.from,
@@ -162,19 +167,19 @@ export class WebSocketService {
     }
     
     const listeners = this.listeners.get(message.type) || [];
-    console.log(`🎯 Found ${listeners.length} listeners for type '${message.type}'`);
+    logger.websocket(`🎯 Found ${listeners.length} listeners for type '${message.type}'`);
     
     if (listeners.length === 0) {
-      console.warn(`⚠️ No listeners registered for message type '${message.type}' - message will be ignored!`);
+      logger.warn(`⚠️ No listeners registered for message type '${message.type}' - message will be ignored!`);
     }
     
     listeners.forEach((listener, index) => {
-      console.log(`🔄 Calling listener ${index + 1}/${listeners.length} with payload:`, message.payload);
+      logger.websocket(`🔄 Calling listener ${index + 1}/${listeners.length} with payload:`, message.payload);
       try {
         listener(message.payload);
-        console.log(`✅ Listener ${index + 1} executed successfully`);
+        logger.websocket(`✅ Listener ${index + 1} executed successfully`);
       } catch (error) {
-        console.error(`❌ Error in listener ${index + 1}:`, error);
+        logger.error(`❌ Error in listener ${index + 1}:`, error);
       }
     });
   }
@@ -184,7 +189,7 @@ export class WebSocketService {
       this.listeners.set(eventType, []);
     }
     this.listeners.get(eventType)!.push(callback);
-    console.log(`🔍 WebSocket listener registered for '${eventType}'. Total listeners: ${this.listeners.get(eventType)!.length}`);
+    logger.websocket(`🔍 WebSocket listener registered for '${eventType}'. Total listeners: ${this.listeners.get(eventType)!.length}`);
   }
 
   off(eventType: string, callback: (data: any) => void) {
@@ -192,7 +197,7 @@ export class WebSocketService {
     const index = listeners.indexOf(callback);
     if (index > -1) {
       listeners.splice(index, 1);
-      console.log(`🗑️ WebSocket listener removed for '${eventType}'. Remaining listeners: ${listeners.length}`);
+      logger.websocket(`🗑️ WebSocket listener removed for '${eventType}'. Remaining listeners: ${listeners.length}`);
     }
   }
 
@@ -205,15 +210,15 @@ export class WebSocketService {
         to,
         timestamp: Date.now()
       };
-      console.log('📤 Sending WebSocket message:', message);
+      logger.websocket('📤 Sending WebSocket message:', message);
       this.ws.send(JSON.stringify(message));
     } else {
-      console.error('❌ WebSocket is not connected - readyState:', this.ws?.readyState);
+      logger.error('❌ WebSocket is not connected - readyState:', this.ws?.readyState);
     }
   }
 
   sendChatMessage(chatId: string, content: string, type: 'text' | 'voice' | 'call-history' = 'text') {
-    console.log('💬 Sending chat message:', { chatId, content, type, senderId: this.currentUserId });
+    logger.websocket('💬 Sending chat message:', { chatId, content, type, senderId: this.currentUserId });
     this.sendMessage('message', {
       chatId,
       content,
@@ -236,12 +241,12 @@ export class WebSocketService {
   }
 
   sendCallAnswer(to: string, answer: RTCSessionDescriptionInit) {
-    console.log('📞 Sending call answer to:', to);
+    logger.websocket('📞 Sending call answer to:', to);
     this.sendMessage('call_answer', { answer }, to);
   }
 
   sendCallAccept(to: string, callId?: string) {
-    console.log('✅ Sending call accept notification to:', to);
+    logger.websocket('✅ Sending call accept notification to:', to);
     this.sendMessage('call_accept', { callId }, to);
   }
 
@@ -250,19 +255,19 @@ export class WebSocketService {
   }
 
   sendCallEnd(to: string) {
-    console.log("📞 Call end message sent ------------------------->");
+    logger.websocket("📞 Call end message sent ------------------------->");
     
     // Throttle call_end messages to prevent infinite loops
     const now = Date.now();
     const lastSent = this.callEndThrottle.get(to) || 0;
     
     if (now - lastSent < 1000) { // Only allow one call_end per second per user
-      console.log('🛑 Throttling call_end message to', to, '- too frequent');
+      logger.websocket('🛑 Throttling call_end message to', to, '- too frequent');
       return;
     }
     
     this.callEndThrottle.set(to, now);
-    console.log('📤 Sending throttled call_end to:', to);
+    logger.websocket('📤 Sending throttled call_end to:', to);
     
     // Enhanced debugging for call_end message structure
     const message = {
@@ -273,7 +278,7 @@ export class WebSocketService {
       timestamp: Date.now()
     };
     
-    console.log('🔍 Call_end message structure:', {
+    logger.websocket('🔍 Call_end message structure:', {
       messageType: message.type,
       fromUser: message.from,
       toUser: message.to,
@@ -298,12 +303,12 @@ export class WebSocketService {
   }
 
   sendVideoStatus(to: string, isVideoOff: boolean, userId: string) {
-    console.log('📡 Sending video status:', { to, isVideoOff, userId });
+    logger.websocket('📡 Sending video status:', { to, isVideoOff, userId });
     this.sendMessage('call_video_status', { videoEnabled: !isVideoOff, userId }, to);
   }
 
   disconnect() {
-    console.log('🔴 Disconnecting WebSocket...');
+    logger.websocket('🔴 Disconnecting WebSocket...');
     this.reconnectAttempts = this.maxReconnectAttempts; // Prevent reconnection
     
     if (this.ws) {
@@ -314,7 +319,7 @@ export class WebSocketService {
     this.listeners.clear();
     this.connectionPromise = null;
     this.isConnecting = false;
-    console.log('✅ WebSocket disconnected and cleaned up');
+    logger.websocket('✅ WebSocket disconnected and cleaned up');
   }
 
   isConnected(): boolean {
@@ -354,9 +359,9 @@ export class WebSocketService {
   }
 
   debugListeners(): void {
-    console.log('🔍 Current WebSocket listeners:');
+    logger.websocket('🔍 Current WebSocket listeners:');
     this.listeners.forEach((callbacks, eventType) => {
-      console.log(`  - ${eventType}: ${callbacks.length} listener(s)`);
+      logger.websocket(`  - ${eventType}: ${callbacks.length} listener(s)`);
     });
   }
 }

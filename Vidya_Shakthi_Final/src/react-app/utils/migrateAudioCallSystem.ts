@@ -5,6 +5,7 @@
 
 import { unifiedAudioCallService } from '../services/UnifiedAudioCallService';
 import { useUnifiedAudioCall } from '../hooks/useUnifiedAudioCall';
+import { logger } from '../utils/logger';
 
 // List of files that need to be updated
 export const MIGRATION_TARGETS = {
@@ -108,7 +109,7 @@ interface UnifiedAudioCallModalProps {
     code: `
 // OLD - Generic error handling
 } catch (error: any) {
-  console.error('Error starting audio call:', error);
+  logger.error('Error starting audio call:', error);
   setCallState(prev => ({
     ...prev,
     connectionStatus: 'disconnected',
@@ -193,7 +194,7 @@ export const validateMigration = () => {
   
   conflictingImports.forEach(importName => {
     // This would be implemented with actual file scanning
-    console.log(`Checking for ${importName} usage...`);
+    logger.info(`Checking for ${importName} usage...`);
   });
   
   return issues;
@@ -240,11 +241,11 @@ export const migrationHelpers = {
   
   // Clean up old implementations
   cleanupOldImplementations: () => {
-    console.log('🧹 Cleaning up old audio call implementations...');
+    logger.info('🧹 Cleaning up old audio call implementations...');
     
     // This would remove old files and update imports
     MIGRATION_TARGETS.deprecated.forEach(file => {
-      console.log(`Removing deprecated file: ${file}`);
+      logger.info(`Removing deprecated file: ${file}`);
     });
   }
 };

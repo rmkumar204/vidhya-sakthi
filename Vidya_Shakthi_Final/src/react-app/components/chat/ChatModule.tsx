@@ -3,6 +3,7 @@ import { Users, MessageCircle, Paperclip, Clock, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import MessageInput from '../MessageInput';
 import TypingIndicator from '../TypingIndicator';
+import { logger } from '../../utils/logger';
 
 interface ChatMessage {
   id: number;
@@ -70,7 +71,7 @@ export default function ChatModule({ userId }: ChatModuleProps) {
         setChatRooms(data.rooms || []);
       }
     } catch (error) {
-      console.error('Failed to fetch chat rooms:', error);
+      logger.error('Failed to fetch chat rooms:', error);
       toast.error('Failed to load chat rooms');
     }
   };
@@ -84,7 +85,7 @@ export default function ChatModule({ userId }: ChatModuleProps) {
         setMessages(data.messages || []);
       }
     } catch (error) {
-      console.error('Failed to fetch messages:', error);
+      logger.error('Failed to fetch messages:', error);
       toast.error('Failed to load messages');
     } finally {
       setIsLoading(false);
@@ -115,7 +116,7 @@ export default function ChatModule({ userId }: ChatModuleProps) {
         fetchChatRooms(); // Update room list with latest message
       }
     } catch (error) {
-      console.error('Failed to send message:', error);
+      logger.error('Failed to send message:', error);
       toast.error('Failed to send message');
     }
   };

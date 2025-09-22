@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Call } from '../types';
 import { PhoneIcon, XIcon } from './Icons';
+import { logger } from '../utils/logger';
 
 // Utility function to get user initials
 const getUserInitials = (name: string | undefined): string => {
@@ -41,7 +42,7 @@ const CallModal: React.FC<CallModalProps> = ({ call, onAccept, onReject }) => {
     // Create a simple ringtone using Web Audio API
     const playRingtone = () => {
       if (audioRef.current) {
-        audioRef.current.play().catch(console.error);
+        audioRef.current.play().catch((error) => logger.error('Failed to play call ringtone', { error: error.message }));
       }
     };
 

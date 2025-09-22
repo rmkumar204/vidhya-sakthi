@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { callService } from '../services/CallService';
+import { logger } from '../utils/logger';
 
 interface Props {
   children: ReactNode;
@@ -23,7 +24,7 @@ export class CallErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Call Error Boundary caught an error:', error, errorInfo);
+    logger.error('Call Error Boundary caught an error:', error, errorInfo);
     
     this.setState({
       error,
@@ -34,7 +35,7 @@ export class CallErrorBoundary extends Component<Props, State> {
     try {
       callService.endCall();
     } catch (cleanupError) {
-      console.error('Error during call cleanup:', cleanupError);
+      logger.error('Error during call cleanup:', cleanupError);
     }
   }
 

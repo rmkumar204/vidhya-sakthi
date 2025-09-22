@@ -4,6 +4,7 @@ import { AuthProvider } from "@/react-app/contexts/AuthContext";
 import { useAuth } from "@/react-app/hooks/useAuth";
 import { Toaster } from 'react-hot-toast';
 import { useState, useEffect } from 'react';
+import { logger } from "@/react-app/utils/logger";
 
 // Public pages
 import RoleSelection from "@/react-app/pages/RoleSelection";
@@ -74,7 +75,7 @@ const CallManager: React.FC = () => {
       const userData = await getUserData(userId, token || undefined);
       return userData?.name || fallbackName || 'Unknown User';
     } catch (error) {
-      console.error('Failed to get user name:', error);
+      logger.error('Failed to get user name:', error);
       return fallbackName || 'Unknown User';
     }
   };
@@ -129,7 +130,7 @@ const CallManager: React.FC = () => {
 
       await initiateCall(toUserId, callType, participants);
     } catch (error) {
-      console.error('Failed to initiate call:', error);
+      logger.error('Failed to initiate call:', error);
     }
   };
 
@@ -146,7 +147,7 @@ const CallManager: React.FC = () => {
         incomingCall.participants
       );
     } catch (error) {
-      console.error('Failed to accept call:', error);
+      logger.error('Failed to accept call:', error);
     }
   };
 
@@ -157,7 +158,7 @@ const CallManager: React.FC = () => {
     try {
       await rejectCall(incomingCall.callId, incomingCall.fromUserId);
     } catch (error) {
-      console.error('Failed to reject call:', error);
+      logger.error('Failed to reject call:', error);
     }
   };
 
@@ -166,7 +167,7 @@ const CallManager: React.FC = () => {
     try {
       await endCall();
     } catch (error) {
-      console.error('Failed to end call:', error);
+      logger.error('Failed to end call:', error);
     }
   };
 
@@ -192,7 +193,7 @@ const CallManager: React.FC = () => {
   const isVideoCallRequest = (incomingCall && incomingCall.callType === 'video') || 
                             (currentCall && currentCall.type === 'video' && currentCall.status === 'ringing');
   
-  console.log('🔍 CallManager: Current call states:', {
+  logger.info('🔍 CallManager: Current call states:', {
     isReceivingCall,
     isOutgoingCall, 
     isAudioCallActive,
@@ -302,7 +303,7 @@ const CallManager: React.FC = () => {
                 await startScreenShare();
               }
             } catch (error) {
-              console.error('Screen sharing toggle failed:', error);
+              logger.error('Screen sharing toggle failed:', error);
             }
           }}
           onMinimize={handleMinimizeCall}
@@ -360,7 +361,7 @@ const CallManager: React.FC = () => {
                 await startScreenShare();
               }
             } catch (error) {
-              console.error('Screen sharing toggle failed:', error);
+              logger.error('Screen sharing toggle failed:', error);
             }
           }}
           onMinimize={handleMinimizeCall}

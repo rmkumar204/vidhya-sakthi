@@ -10,6 +10,7 @@ import {
   FilterOptions,
   PaginationInfo 
 } from '@/react-app/services/ProjectService';
+import { logger } from '@/react-app/utils/logger';
 
 export function useProjects(initialParams: ProjectListParams = {}) {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -57,7 +58,7 @@ export function useProjects(initialParams: ProjectListParams = {}) {
       const options = await getFilterOptions();
       setFilterOptions(options);
     } catch (e: any) {
-      console.error('Failed to fetch filter options:', e);
+      logger.error('Failed to fetch filter options:', e);
     }
   }, []);
 

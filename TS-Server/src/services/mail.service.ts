@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { logger } from '../config/logger';
 
 const smtpHost = process.env.SMTP_HOST || '';
 const smtpPort = Number(process.env.SMTP_PORT || 587);
@@ -16,10 +17,22 @@ let transporter = nodemailer.createTransport({
 export async function sendEmail(to: string, subject: string, html: string) {
   if (!smtpHost || !fromEmail) {
     // Fallback: log if SMTP not configured
-    console.warn('[mail.service] SMTP not configured. Intended email:', { to, subject });
+    logger.warn('SMTP not configured. Email not sent', { to, subject });
     return;
   }
-  await transporter.sendMail({ from: fromEmail, to, subject, html });
+  
+  try {
+    await transporter.sendMail({ from: fromEmail, to, subject, html });
+    logger.email('Email sent successfully', { to, subject });
+  } catch (error: any) {
+    logger.error('Failed to send email', { 
+      to, 
+      subject, 
+      error: error.message,
+      stack: error.stack 
+    });
+    throw error;
+  }
 }
 
 export async function sendOtpEmail(to: string, otp: string, purpose: 'register' | 'reset') {
@@ -32,6 +45,8 @@ export async function sendOtpEmail(to: string, otp: string, purpose: 'register' 
       <p>This code will expire in 5 minutes. If you did not request this, you can ignore this email.</p>
     </div>
   `;
+  
+  logger.email(`Sending OTP email for ${purpose}`, { to, purpose });
   await sendEmail(to, title, html);
 }
 

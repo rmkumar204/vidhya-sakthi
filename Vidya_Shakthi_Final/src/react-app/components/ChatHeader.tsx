@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { User } from '../types';
 import { PhoneIcon, VideoCameraIcon, ComputerDesktopIcon } from '@heroicons/react/24/outline';
 import { useAppContext } from '../hooks/useAppContext';
+import { logger } from '../utils/logger';
 
 interface ChatHeaderProps {
   user: User;
@@ -33,14 +34,14 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
         await initiateCall(user, 'video');
         // Note: Screen sharing will be available once the call is established
       } catch (error) {
-        console.error('Failed to start video call for screen sharing:', error);
+        logger.error('Failed to start video call for screen sharing:', error);
       }
     }
   }, [isInCall, isVideoCall, onToggleScreenShare, initiateCall, user]);
 
   const handleAudioCall = useCallback(() => {
 
-    console.log("---------------- initiateCall",user);
+    logger.chat("---------------- initiateCall",user);
     
     initiateCall(user, 'audio');
   }, [initiateCall, user]);

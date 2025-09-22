@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import helmet from 'helmet';
 import connectDB from './config/db';
 import { notFound, errorHandler } from './middleware/error.middleware';
+import { logger, morganStream } from './config/logger';
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
 import locationRoutes from './routes/location.routes';
@@ -27,9 +28,11 @@ app.use(cors()); // Enable CORS
 app.use(helmet()); // Set security headers
 app.use(express.json()); // Body parser for JSON
 
-// Dev logging middleware
+// HTTP request logging middleware
 if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev'));
+  app.use(morgan('dev', { stream: morganStream }));
+} else {
+  app.use(morgan('combined', { stream: morganStream }));
 }
 
 // http://localhost:6000/api/locations/states
@@ -54,5 +57,9 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  logger.info(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`, {
+    port: PORT,
+    environment: process.env.NODE_ENV,
+    timestamp: new Date().toISOString()
+  });
 });

@@ -13,6 +13,7 @@ import {
 import { RealTimeConversation } from '../components/RealTimeConversation';
 import Avatar from '../components/Avatar';
 import toast from 'react-hot-toast';
+import { logger } from '../utils/logger';
 
 export default function Conversations() {
   const { user } = useAuth();
@@ -36,7 +37,7 @@ export default function Conversations() {
       const response = await getConversations({ page: 1, limit: 50 }, user?.token || '');
       setConversations(response.conversations);
     } catch (error) {
-      console.error('Failed to load conversations:', error);
+      logger.error('Failed to load conversations:', error);
       toast.error('Failed to load conversations');
     } finally {
       setIsLoading(false);

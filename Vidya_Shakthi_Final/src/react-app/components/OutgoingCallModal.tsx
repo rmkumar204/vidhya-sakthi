@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Call } from '../types';
 import { PhoneIcon, XIcon } from './Icons';
+import { logger } from '../utils/logger';
 
 // Utility function to get user initials
 const getUserInitials = (name: string | undefined): string => {
@@ -40,7 +41,7 @@ const OutgoingCallModal: React.FC<OutgoingCallModalProps> = ({ call, onCancel })
     // Play outgoing call ringtone
     const playOutgoingTone = () => {
       if (audioRef.current) {
-        audioRef.current.play().catch(console.error);
+        audioRef.current.play().catch(logger.error);
       }
     };
 

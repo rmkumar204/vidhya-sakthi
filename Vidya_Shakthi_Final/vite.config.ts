@@ -22,4 +22,10 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  define: {
+    global: 'globalThis',
+  },
+  optimizeDeps: {
+    exclude: ['winston', 'winston-daily-rotate-file']
+  }
 });

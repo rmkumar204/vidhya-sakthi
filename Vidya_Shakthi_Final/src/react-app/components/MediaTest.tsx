@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { getUserMedia, checkMediaPermissions, requestMediaPermissions, isWebRTCSupported } from '../utils/webrtc';
 import { MEDIA_CONSTRAINTS } from '../utils/constants';
+import { logger } from '../utils/logger';
 
 export const MediaTest: React.FC = () => {
   const [status, setStatus] = useState<string>('Ready to test');
@@ -39,7 +40,7 @@ export const MediaTest: React.FC = () => {
       
       if (videoRef.current) {
         videoRef.current.srcObject = newStream;
-        videoRef.current.play().catch(console.error);
+        videoRef.current.play().catch(logger.error);
       }
       
       setStatus('Video call test successful!');
@@ -64,7 +65,7 @@ export const MediaTest: React.FC = () => {
       // Stop all media tracks
       stream.getTracks().forEach(track => {
         if (process.env.NODE_ENV === 'development') {
-          console.log(`Stopping ${track.kind} track:`, track.label);
+          logger.info(`Stopping ${track.kind} track:`, track.label);
         }
         track.stop();
       });

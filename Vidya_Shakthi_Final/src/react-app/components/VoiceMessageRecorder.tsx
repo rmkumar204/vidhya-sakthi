@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { logger } from '../utils/logger';
 
 interface VoiceMessageRecorderProps {
   onRecordingComplete: (audioBlob: Blob, duration: number) => void;
@@ -96,7 +97,7 @@ export const VoiceMessageRecorder: React.FC<VoiceMessageRecorderProps> = ({
       }, 1000);
       
     } catch (error: any) {
-      console.error('Failed to start recording:', error);
+      logger.error('Failed to start recording:', error);
       setError('Failed to access microphone. Please check permissions.');
     }
   };
@@ -166,7 +167,7 @@ export const VoiceMessageRecorder: React.FC<VoiceMessageRecorderProps> = ({
       
       updateAudioLevel();
     } catch (error) {
-      console.error('Failed to setup audio level monitoring:', error);
+      logger.error('Failed to setup audio level monitoring:', error);
     }
   };
 

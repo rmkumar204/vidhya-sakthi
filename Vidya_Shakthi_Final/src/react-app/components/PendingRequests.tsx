@@ -7,6 +7,7 @@ import {
 } from '@/react-app/services/ConnectionRequestService';
 import { ClockIcon, UserIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { logger } from '@/react-app/utils/logger';
 
 interface PendingRequestsProps {
   refreshTrigger?: number;
@@ -28,7 +29,7 @@ export default function PendingRequests({ refreshTrigger, onRequestUpdate }: Pen
       const response = await getConnectionRequests({ status: 'pending' }, token);
       setRequests(response.requests);
     } catch (error) {
-      console.error('Failed to fetch pending requests:', error);
+      logger.error('Failed to fetch pending requests:', error);
       toast.error('Failed to load pending requests');
     } finally {
       setLoading(false);
@@ -65,7 +66,7 @@ export default function PendingRequests({ refreshTrigger, onRequestUpdate }: Pen
       
       onRequestUpdate?.();
     } catch (error: any) {
-      console.error('Failed to respond to request:', error);
+      logger.error('Failed to respond to request:', error);
       toast.error(error.message || 'Failed to respond to request');
     } finally {
       setProcessingRequest(null);

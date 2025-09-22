@@ -125,7 +125,7 @@ npm start
 
 ### 2. Start the Frontend
 ```bash
-cd Vidya_Shakthi_Final
+cd Vidya_shakti_Final
 npm install
 npm run dev
 # App runs on port 5173

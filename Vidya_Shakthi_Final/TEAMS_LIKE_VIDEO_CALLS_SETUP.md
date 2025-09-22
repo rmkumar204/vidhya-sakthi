@@ -42,7 +42,7 @@ The server will start on `http://localhost:8080`
 ### 2. Start the React App
 
 ```bash
-cd Vidya_Shakthi_Final
+cd Vidya_shakti_Final
 npm install
 npm run dev
 ```

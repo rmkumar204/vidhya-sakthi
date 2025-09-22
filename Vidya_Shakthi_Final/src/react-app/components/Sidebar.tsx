@@ -78,7 +78,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
       `}>
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-            Vidya Shakthi
+            Vidya shakti
           </h1>
           <button
             onClick={() => setSidebarOpen(false)}

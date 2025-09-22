@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "Starting Vidya Shakthi Final Application..."
+echo "Starting Vidya shakti Final Application..."
 echo
 
 echo "[1/2] Starting WebSocket Signaling Server on port 8080..."

@@ -41,10 +41,10 @@ export interface StoredConnection {
 
 class LocalStorageService {
   private readonly STORAGE_KEYS = {
-    MESSAGES: 'vidya-sakthi-messages',
-    CHATS: 'vidya-sakthi-chats',
-    CONNECTIONS: 'vidya-sakthi-connections',
-    USER_PREFERENCES: 'vidya-sakthi-preferences'
+    MESSAGES: 'vidya-shakti-messages',
+    CHATS: 'vidya-shakti-chats',
+    CONNECTIONS: 'vidya-shakti-connections',
+    USER_PREFERENCES: 'vidya-shakti-preferences'
   };
 
   // Message Management

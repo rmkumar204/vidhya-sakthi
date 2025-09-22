@@ -16,7 +16,7 @@ But the caller's side didn't reflect the call acceptance and remained in "ringin
 
 ### 1. Missing Call Accept Notification Flow
 
-The [acceptCall](file://c:\Resileo\vidhya-sakthi\Vidya_Shakthi_Final\src\react-app\hooks\useCallSignaling.ts#L314-L354) function in `useCallSignaling.ts` was only:
+The [acceptCall](file://c:\Resileo\vidya-shakti\Vidya_shakti_Final\src\react-app\hooks\useCallSignaling.ts#L314-L354) function in `useCallSignaling.ts` was only:
 1. Updating local state to ACTIVE
 2. Starting WebRTC media negotiation (answer)
 3. Setting up local stream
@@ -34,14 +34,14 @@ The flow was:
 
 ### 3. Client-Side Missing Components
 
-- No `sendCallAccept()` method in [WebSocketService](file://c:\Resileo\vidhya-sakthi\Vidya_Shakthi_Final\src\react-app\services\WebSocketService.ts)
+- No `sendCallAccept()` method in [WebSocketService](file://c:\Resileo\vidya-shakti\Vidya_shakti_Final\src\react-app\services\WebSocketService.ts)
 - No `call_accept` message type in WebSocket interface
-- No `call_accept` WebSocket listener in [useCallSignaling](file://c:\Resileo\vidhya-sakthi\Vidya_Shakthi_Final\src\react-app\hooks\useCallSignaling.ts)
-- No `handleCallAccept` method in [WebRTCService](file://c:\Resileo\vidhya-sakthi\Vidya_Shakthi_Final\src\react-app\services\WebRTCService.ts)
+- No `call_accept` WebSocket listener in [useCallSignaling](file://c:\Resileo\vidya-shakti\Vidya_shakti_Final\src\react-app\hooks\useCallSignaling.ts)
+- No `handleCallAccept` method in [WebRTCService](file://c:\Resileo\vidya-shakti\Vidya_shakti_Final\src\react-app\services\WebRTCService.ts)
 
 ### 4. Server-Side Issues
 
-The server had [handleCallAccept](file://c:\Resileo\vidhya-sakthi\Vidya_Shakthi_Final\server\server.js#L227-L261) but:
+The server had [handleCallAccept](file://c:\Resileo\vidya-shakti\Vidya_shakti_Final\server\server.js#L227-L261) but:
 - Didn't properly extract target user ID from message structure
 - Had limited debugging and error handling
 

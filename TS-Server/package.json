@@ -1,5 +1,5 @@
 {
-  "name": "vidya-shakthi-backend",
+  "name": "vidya-shakti-backend",
   "version": "1.0.0",
   "description": "Backend for Vidya Shakti Yuva application",
   "main": "dist/server.js",

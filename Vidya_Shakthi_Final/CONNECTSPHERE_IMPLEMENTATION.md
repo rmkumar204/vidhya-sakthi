@@ -2,7 +2,7 @@
 
 ## 🚀 Overview
 
-This implementation brings ConnectSphere's comprehensive real-time communication architecture to the Vidya Shakthi platform, featuring production-grade audio/video calling, screen sharing, voice messages, and enhanced messaging capabilities.
+This implementation brings ConnectSphere's comprehensive real-time communication architecture to the Vidya shakti platform, featuring production-grade audio/video calling, screen sharing, voice messages, and enhanced messaging capabilities.
 
 ## ✨ Key Features Implemented
 

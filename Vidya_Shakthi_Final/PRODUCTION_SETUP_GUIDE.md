@@ -48,7 +48,7 @@ export const webSocketService = new WebSocketService('wss://your-signaling-serve
 ### 1.2 Build the Frontend
 
 ```bash
-cd Vidya_Shakthi_Final
+cd Vidya_shakti_Final
 npm run build
 ```
 
@@ -252,7 +252,7 @@ Add a web app manifest for mobile installation:
 ```json
 // public/manifest.json
 {
-  "name": "Vidya Shakthi Messages",
+  "name": "Vidya shakti Messages",
   "short_name": "VS Messages",
   "start_url": "/",
   "display": "standalone",
